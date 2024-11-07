@@ -4,40 +4,32 @@
   <arg name="rtabmap_args" default="--delete_db_on_start"/>
   <arg name="localization" default="false"/>
 
-  <!-- Static Transform Publishers to Ensure Required Frames Exist -->
-  <!-- Creates a static transform between 'odom' and 'base_footprint' -->
-  <node pkg="tf" type="static_transform_publisher" name="odom_to_base_footprint" args="0 0 0 0 0 0 odom base_footprint 100" />
-
-  <!-- Creates a static transform between 'base_footprint' and 'B1_tf/camera_link' -->
-  <node pkg="tf" type="static_transform_publisher" name="camera_link_to_base" args="0 0 0 0 0 0 base_footprint B1_tf/camera_link 100" />
-
   <!-- SLAM Node -->
   <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
-    <param name="frame_id" type="string" value="base_footprint"/>
+    <param name="frame_id" type="string" value="B1_tf/base_footprint"/>
+    <param name="odom_frame_id" type="string" value="B1_tf/odom"/>
     <param name="subscribe_depth" type="bool" value="false"/>
     <param name="subscribe_scan" type="bool" value="false"/>
-    <param name="odom_frame_id" type="string" value="odom"/>
-
-    <!-- Increase queue sizes for better synchronization -->
-    <param name="sync_queue_size" type="int" value="20"/>
-    <param name="topic_queue_size" type="int" value="20"/>
+    <param name="sync_queue_size" type="int" value="30"/>
+    <param name="topic_queue_size" type="int" value="30"/>
 
     <!-- Remap to the correct camera topics -->
     <remap from="rgb/image" to="/B1/rrbot/camera1/image_raw"/>
     <remap from="rgb/camera_info" to="/B1/rrbot/camera1/camera_info"/>
-
     <param name="rgb/image_transport" type="string" value="raw"/>
   </node>
 
   <!-- Visualization Node -->
   <node pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" output="screen">
+    <param name="frame_id" type="string" value="B1_tf/base_footprint"/>
     <param name="subscribe_depth" type="bool" value="false"/>
-    <param name="frame_id" type="string" value="base_footprint"/>
+    <param name="sync_queue_size" type="int" value="30"/>
+    <param name="topic_queue_size" type="int" value="30"/>
 
     <!-- Remap to the correct camera topics for visualization -->
     <remap from="rgb/image" to="/B1/rrbot/camera1/image_raw"/>
     <remap from="rgb/camera_info" to="/B1/rrbot/camera1/camera_info"/>
-
     <param name="rgb/image_transport" type="string" value="raw"/>
   </node>
+
 </launch>
