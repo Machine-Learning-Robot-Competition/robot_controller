@@ -9,7 +9,6 @@ project(robot_controller)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   rospy
-  sjtu_drone
 )
 
 ## System dependencies are found with CMake's conventions

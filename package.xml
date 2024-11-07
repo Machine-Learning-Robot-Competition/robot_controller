@@ -50,11 +50,11 @@
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>rospy</build_depend>
-  <build_depend>sjtu_drone</build_depend>
+  <build_depend>hector_quadrotor_noetic</build_depend>
   <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>sjtu_drone</build_export_depend>
+  <build_export_depend>hector_quadrotor_noetic</build_export_depend>
   <exec_depend>rospy</exec_depend>
-  <exec_depend>sjtu_drone</exec_depend>
+  <exec_depend>hector_quadrotor_noetic</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
