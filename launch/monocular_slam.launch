@@ -4,18 +4,16 @@
   <arg name="rtabmap_args" default="--delete_db_on_start"/>
   <arg name="localization" default="false"/>
 
-  <!-- Static transforms -->
-  <!-- Uncomment this if you don't have a transform from odom to base footprint in your URDF -->
-  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_basefootprint" args="0 0 0 0 0 0 B1_tf/odom B1_tf/base_footprint" /> -->
+  <!-- Static transform for base_footprint to camera_link -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" args="x y z roll pitch yaw B1_tf/base_footprint B1_tf/camera_link 10" />
 
-  <!-- SLAM Node Configuration for Monocular Camera -->
+  <!-- Monocular SLAM Configuration for RTAB-Map -->
   <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
     <param name="frame_id" type="string" value="B1_tf/base_footprint"/>
     <param name="odom_frame_id" type="string" value="B1_tf/odom"/>
     <param name="wait_for_transform" type="bool" value="true"/>
-    
-    <!-- Enable monocular SLAM mode -->
+
+    <!-- Set up for monocular SLAM (disables depth, RGB-D, and stereo subscriptions) -->
     <param name="subscribe_depth" type="bool" value="false"/>
     <param name="subscribe_rgbd" type="bool" value="false"/>
     <param name="subscribe_stereo" type="bool" value="false"/>
@@ -25,16 +23,15 @@
     <remap from="rgb/image" to="/B1/rrbot/camera1/image_raw"/>
     <remap from="rgb/camera_info" to="/B1/rrbot/camera1/camera_info"/>
 
-    <!-- Configure image transport for monocular SLAM -->
+    <!-- Configure image transport and enable loop closure detection for monocular mode -->
     <param name="rgb/image_transport" type="string" value="raw"/>
-
-    <!-- RTAB-Map parameters for monocular mode -->
     <param name="RGBD/ProximityBySpace" type="string" value="true"/> <!-- Enable local loop closure detection -->
     <param name="Mem/IncrementalMemory" type="bool" value="true"/> <!-- Allow incremental mapping -->
     <param name="Mem/InitWMWithAllNodes" type="bool" value="true"/>
+    <param name="Vis/MinInliers" type="int" value="0"/> <!-- Lower threshold for loop closure if struggling with detection -->
   </node>
 
-  <!-- Visualization Node -->
+  <!-- Visualization Configuration for RTAB-Map -->
   <node pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" output="screen">
     <param name="subscribe_depth" type="bool" value="false"/>
     <param name="frame_id" type="string" value="B1_tf/base_footprint"/>
