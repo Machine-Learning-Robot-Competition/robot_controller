@@ -1,6 +1,6 @@
 <launch>
       <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
-            <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_stereo.gazebo.xacro"/> 
-      </include>      
-      <node pkg="robot_controller" type="robot.py" name="robot_brain" output="screen"/>
+            <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_plus.gazebo.xacro"/> 
+      </include>
+      <!-- <node pkg="robot_controller" type="robot.py" name="robot_brain" output="screen"/> -->
 </launch>
