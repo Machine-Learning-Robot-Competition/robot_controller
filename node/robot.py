@@ -3,6 +3,7 @@ import rospy
 from geometry_msgs.msg import Twist, Vector3
 from std_msgs.msg import Empty
 from hector_uav_msgs.srv import EnableMotors
+from robot_controller.srv import GoForward, GoForwardResponse
 import time
 import threading
 
@@ -11,6 +12,7 @@ ROBOT_COMMAND_TOPIC = "/cmd_vel"
 ROBOT_TAKEOFF_COMMAND = "/ardrone/takeoff"
 ENABLE_MOTORS_SERVICE = "/enable_motors"
 PUBLISH_RATE = 30  # Rate to publish the drive command to the drone, in Hz
+GO_FORWARD_SERVICE = "/go_forward"
 
 
 ZERO_VECTOR = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
@@ -25,10 +27,11 @@ class Robot:
         # Topic Registrations
         self._cmd_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self._takeoff_publisher = rospy.Publisher('/ardrone/takeoff', Empty, queue_size=1)
+
+        self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
         
         # Movement
         self._move = Twist()
-        self._stopped = False
         
         # Publish Threading Stuff
         self._publish_rate = PUBLISH_RATE
@@ -79,12 +82,7 @@ class Robot:
         """
         Stop the drone (try to cease linear and angular motion). No effect if already stopped.
         """
-        if not self._stopped:
-            self._move = Twist(linear=Vector3(0.0, 0.0, 0.0), angular=Vector3(0.0, 0.0, 0.0))
-            self._stopped = True
-
-        else:
-            pass  # No action needed.
+        self._move = Twist(linear=Vector3(0.0, 0.0, 0.0), angular=Vector3(0.0, 0.0, 0.0))
 
     def _publish_command(self, frequency):
         """
@@ -98,6 +96,34 @@ class Robot:
             self._cmd_publisher.publish(self._move)
             
             rate.sleep()
+    
+    def _go_forward(self):
+        """
+        Perform a quick "go forward" operation
+        """
+        rospy.loginfo("Beginning go forward...")
+        
+        self.set_action(linear=Vector3(1.0, 0.0, 0.0))
+
+        time.sleep(1) # 1.0 s
+
+        self.stop()
+
+        rospy.loginfo("Completed go forward!")
+
+    def _handle_go_forward(self, request):
+        response = GoForwardResponse()
+
+        try:
+            self._go_forward()
+
+            response.success = True
+
+        except Exception:
+            response.success = False
+
+        return response
+
 
     def _begin(self):
         """

@@ -13,6 +13,7 @@ from gazebo_msgs.srv import SetModelState
 import pathlib
 from typing import List
 from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, LoadController, UnloadController, LoadControllerRequest, UnloadControllerRequest
+from robot_controller.srv import GoForward, GoForwardRequest
 import subprocess
 import os
 import toml
@@ -33,6 +34,7 @@ CONTROLLER_LOAD_SRV: str = "controller_manager/load_controller"
 CONTROLLER_UNLOAD_SRV: str = "controller_manager/unload_controller"
 CONTROLLER_UNLOAD_SRV: str = "controller_manager/unload_controller"
 CONTROLLER_SWITCH_SRV: str = "controller_manager/switch_controller"
+GO_FORWARD_SERVICE: str = "/go_forward"
 
 
 logger = logging.getLogger(__name__)
@@ -107,10 +109,11 @@ class RobotUI(QtWidgets.QMainWindow):
         self._switch_controller_service = rospy.ServiceProxy(CONTROLLER_SWITCH_SRV,
                                               SwitchController,
                                               persistent=True)
-
+        
         self.begin_button.clicked.connect(self.SLOT_begin_button)
         self.reset_drone.clicked.connect(self.SLOT_reset_drone)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
+        self.go_forward_button.clicked.connect(self.SLOT_go_forward)
 
     def _launch_node(self):
         """
@@ -165,6 +168,22 @@ class RobotUI(QtWidgets.QMainWindow):
         else:
             logger.warning("Cannot stop Robot Node: not started!")
 
+    def _go_forward(self):
+        """
+        Initiate a request for the drone to perform a "go forward" operation.
+        """
+        rospy.wait_for_service(GO_FORWARD_SERVICE)
+        try:
+            go_forward = rospy.ServiceProxy(GO_FORWARD_SERVICE, GoForward)
+
+            request = GoForwardRequest()
+
+            response = go_forward(request)
+
+            logger.info(f"Go Forward Response {response}")
+
+        except rospy.ServiceException as e:
+            logger.error(f"Failed to go forward: \n {e}")
 
     def SLOT_begin_button(self):
         logger.info("Trying to begin ROS Node...")
@@ -184,6 +203,11 @@ class RobotUI(QtWidgets.QMainWindow):
         self._load_controllers()  # Restart controllers after a brief pause to try to avoid weird PID stuff
 
         logger.info("Model Reset!")
+
+    def SLOT_go_forward(self):
+        logger.info("Trying to go forward...")
+
+        self._go_forward()
 
     def _load_controllers(self):
         """
