@@ -8,23 +8,31 @@ import time
 import threading
 
 
-ROBOT_COMMAND_TOPIC = "/cmd_vel"
+# Topic and Service Names
+ROBOT_VELOCITY_TOPIC = "/cmd_vel"
 ROBOT_TAKEOFF_COMMAND = "/ardrone/takeoff"
 ENABLE_MOTORS_SERVICE = "/enable_motors"
-PUBLISH_RATE = 30  # Rate to publish the drive command to the drone, in Hz
 GO_FORWARD_SERVICE = "/go_forward"
-ZERO_VECTOR = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
+ROBOT_COMMAND_TOPIC = "/robot_state_command"
+
+# Other Declarations
+ZERO_VECTOR: Vector3 = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
+PUBLISH_RATE: int = 30  # Rate to publish the drive command to the drone, in Hz
 
 
-class Robot:
+class RobotControlNode:
+    """
+    Node to control the robot's movement
+    """
     def __init__(self):
         rospy.on_shutdown(self._shutdown_hook)  # Connect a callback that gets run when this node gets called to shutdown (just a bit of error logging currently)
 
-        rospy.loginfo("Robot Brain is initializing!")
+        rospy.loginfo("Robot Control is initializing!")
 
         # Topic Registrations
-        self._cmd_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-        self._takeoff_publisher = rospy.Publisher('/ardrone/takeoff', Empty, queue_size=1)
+        self._cmd_publisher = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
+        self._takeoff_publisher = rospy.Publisher(ROBOT_TAKEOFF_COMMAND, Empty, queue_size=1)
+        self._command_subscriber = rospy.Subscriber(ROBOT_COMMAND_TOPIC, Twist, callback=self._set_action_callback, queue_size=1)
 
         # We are advertising this service
         self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
@@ -38,7 +46,7 @@ class Robot:
 
         self._begin()  # Actual initializtion logic is here
 
-        rospy.loginfo("Robot Brain initialized!")
+        rospy.loginfo("Robot Control initialized!")
 
     def takeoff(self):
         """
@@ -48,7 +56,7 @@ class Robot:
 
         self.set_action(linear=Vector3(0.0, 0.0, 0.5))
 
-        time.sleep(0.75)
+        time.sleep(0.33)
 
         self.stop()
 
@@ -76,6 +84,12 @@ class Robot:
             twist.angular = angular
 
         self._move = twist
+
+    def _set_action_callback(self, command: Twist):
+        """
+        Callback to set the move state
+        """
+        self.set_action(twist=command)
 
     def stop(self):
         """
@@ -137,7 +151,6 @@ class Robot:
         self._publish_thread = threading.Thread(target=self._publish_command, args=(self._publish_rate, ))
         self._publish_thread.start()
 
-
     def _enable_motors_service(self):
         """
         According to http://wiki.ros.org/hector_quadrotor/Tutorials/Quadrotor%20indoor%20SLAM%20demo, and experimental verification ( >:() ), we need
@@ -162,13 +175,13 @@ class Robot:
 
 
 if __name__ == "__main__":
-    rospy.init_node('robot_brain')
+    rospy.init_node('robot_control')
 
     time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
-    brain = Robot()
+    robot_control_node = RobotControlNode()
 
-    brain.takeoff()
+    robot_control_node.takeoff()
 
     # This blocks until the node gets a shutdown signal, so that it continues to run 
     # endlessly. Otherwise, it would just exist here and the drone would go brain-dead.
