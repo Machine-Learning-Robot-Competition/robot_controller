@@ -19,6 +19,9 @@ import os
 import toml
 import pprint
 from tf.transformations import quaternion_from_euler
+from cv_utils import convert_cv_to_pixmap
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 
 UI_PATH = pathlib.Path(__file__).parent / "main.ui"
@@ -28,24 +31,21 @@ LAUNCH_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_NODE_NAME]
 CONFIG_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "config" / "robot.toml")
 CONTROLLERS: List[str] = [
     "controller/velocity",
-    "controller/attitude"  # Yes, this is an intentional spelling of altitude as attitude
+    "controller/attitude"
 ]
 CONTROLLER_LOAD_SRV: str = "controller_manager/load_controller"
 CONTROLLER_UNLOAD_SRV: str = "controller_manager/unload_controller"
 CONTROLLER_UNLOAD_SRV: str = "controller_manager/unload_controller"
 CONTROLLER_SWITCH_SRV: str = "controller_manager/switch_controller"
 GO_FORWARD_SERVICE: str = "/go_forward"
-
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+FRONT_CAMERA_TOPIC: str = "/front_cam/camera/image"
 
 
 with open(CONFIG_PATH) as f:
     robot_config = toml.load(f)
 
-logger.info("Loaded Config: ")
-logger.info(f"{pprint.pformat(robot_config)}")
+rospy.loginfo("Loaded Config: ")
+rospy.loginfo(f"{pprint.pformat(robot_config)}")
 
 initial_conditions: dict = robot_config["initial_conditions"]
 robot_model_name: str = robot_config["info"]["model_name"]
@@ -71,19 +71,37 @@ def reset_robot_location():
     msg.twist.angular.y = 0.0
     msg.twist.angular.z = 0.0
 
-    print(msg.pose.position.x)
-    print(type(msg.pose.position.x))
-
     rospy.wait_for_service('/gazebo/set_model_state')
     try:
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         resp = set_state(msg)
         
-        logger.info(f"Set Model State Service Call Succeeded: {resp}")
+        rospy.loginfo(f"Set Model State Service Call Succeeded: {resp}")
 
     except rospy.ServiceException as e:
-        logger.error(f"Set Model State Service Call Failed: {e}")
+        rospy.logerror(f"Set Model State Service Call Failed: {e}")
     
+
+class RosThread(QtCore.QThread):
+    image_received = QtCore.pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__()
+        self.bridge = CvBridge()
+
+    def run(self):
+        self._cv_bridge = CvBridge()
+        self._camera_subscriber = rospy.Subscriber(FRONT_CAMERA_TOPIC, Image, self._read_camera)
+
+        rospy.spin()  # Keeps this thread alive and listening
+
+    def _read_camera(self, msg):
+        try:
+            cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            self.image_received.emit(cv_image)
+        except Exception as e:
+            rospy.error(e)
+
 
 class RobotUI(QtWidgets.QMainWindow):
     def __init__(self):
@@ -93,7 +111,7 @@ class RobotUI(QtWidgets.QMainWindow):
         self._node_process = None
         self._stdout_thread = None
         self._stderr_thread = None
-
+                
         # Acquire services for controller loading and unloading 
         rospy.wait_for_service(CONTROLLER_LOAD_SRV)
         self._load_controller_service = rospy.ServiceProxy(CONTROLLER_LOAD_SRV,
@@ -109,11 +127,19 @@ class RobotUI(QtWidgets.QMainWindow):
         self._switch_controller_service = rospy.ServiceProxy(CONTROLLER_SWITCH_SRV,
                                               SwitchController,
                                               persistent=True)
-        
+
+        self.ros_thread = RosThread()
+        self.ros_thread.image_received.connect(self._update_camera_feed)
+        self.ros_thread.start()
+                
         self.begin_button.clicked.connect(self.SLOT_begin_button)
         self.reset_drone.clicked.connect(self.SLOT_reset_drone)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
         self.go_forward_button.clicked.connect(self.SLOT_go_forward)
+
+    def _update_camera_feed(self, cv_image):
+        pixmap = convert_cv_to_pixmap(cv_image)
+        self.camera_feed.setPixmap(pixmap)
 
     def _launch_node(self):
         """
@@ -132,12 +158,12 @@ class RobotUI(QtWidgets.QMainWindow):
             def stream_stdout():
                 """Thread function to read and print stdout line by line."""
                 for line in self._node_process.stdout:
-                    logger.info(line)
+                    rospy.loginfo(line)
 
             def stream_stderr():
                 """Thread function to read and print stderr line by line."""
                 for line in self._node_process.stdout:
-                    logger.error(line)
+                    rospy.logerror(line)
 
             self._stdout_thread = threading.Thread(target=stream_stdout)
             self._stderr_thread = threading.Thread(target=stream_stderr)
@@ -145,10 +171,10 @@ class RobotUI(QtWidgets.QMainWindow):
             self._stdout_thread.start()
             self._stderr_thread.start()
 
-            logger.info("Robot Node has been started.")
+            rospy.loginfo("Robot Node has been started.")
             
         else:
-            logger.warning("Cannot start Robot Node: already started!")
+            rospy.logerror("Cannot start Robot Node: already started!")
 
     def _kill_node(self):
         """
@@ -163,10 +189,10 @@ class RobotUI(QtWidgets.QMainWindow):
 
             self._node_process.wait()
 
-            logger.info("Robot Node has been stopped.")
+            rospy.loginfo("Robot Node has been stopped.")
 
         else:
-            logger.warning("Cannot stop Robot Node: not started!")
+            rospy.logerror("Cannot stop Robot Node: not started!")
 
     def _go_forward(self):
         """
@@ -180,21 +206,21 @@ class RobotUI(QtWidgets.QMainWindow):
 
             response = go_forward(request)
 
-            logger.info(f"Go Forward Response {response}")
+            rospy.loginfo(f"Go Forward Response {response}")
 
         except rospy.ServiceException as e:
-            logger.error(f"Failed to go forward: \n {e}")
+            rospy.logerror(f"Failed to go forward: \n {e}")
 
     def SLOT_begin_button(self):
-        logger.info("Trying to begin ROS Node...")
+        rospy.loginfo("Trying to begin ROS Node...")
         self._launch_node()
 
     def SLOT_reset_drone(self):
-        logger.info("Trying to reset drone...")
+        rospy.loginfo("Trying to reset drone...")
         self._kill_node()
 
     def SLOT_reset_model(self):
-        logger.info("Trying to Reset Model...")
+        rospy.loginfo("Trying to Reset Model...")
 
         self._unload_controllers()  # Stop the controllers to try to avoid weird PID stuff
 
@@ -202,10 +228,10 @@ class RobotUI(QtWidgets.QMainWindow):
 
         self._load_controllers()  # Restart controllers after a brief pause to try to avoid weird PID stuff
 
-        logger.info("Model Reset!")
+        rospy.loginfo("Model Reset!")
 
     def SLOT_go_forward(self):
-        logger.info("Trying to go forward...")
+        rospy.loginfo("Trying to go forward...")
 
         self._go_forward()
 
@@ -222,7 +248,7 @@ class RobotUI(QtWidgets.QMainWindow):
 
                 response = self._load_controller_service(request)
 
-                logger.info(f"Service Call Response to Load {controller}: {response}")
+                rospy.loginfo(f"Service Call Response to Load {controller}: {response}")
 
                 # Now, start the controller
                 switch_requqest = SwitchControllerRequest(start_controllers=[controller],
@@ -232,13 +258,13 @@ class RobotUI(QtWidgets.QMainWindow):
                 try:
                     switch_response = self._switch_controller_service(switch_requqest)
 
-                    logger.info(f"Service Call Response to Start {controller}: {switch_response}")
+                    rospy.loginfo(f"Service Call Response to Start {controller}: {switch_response}")
 
                 except rospy.ServiceException as e:
-                        logger.error(f"Failed to Start Controller {controller}:\n {e}")
+                        rospy.logerror(f"Failed to Start Controller {controller}:\n {e}")
 
             except rospy.ServiceException as e:
-                logger.error(f"Failed to Load Controller {controller}:\n {e}")
+                rospy.logerror(f"Failed to Load Controller {controller}:\n {e}")
                 break
 
     def _unload_controllers(self):
@@ -257,10 +283,10 @@ class RobotUI(QtWidgets.QMainWindow):
                 try:
                     switch_response = self._switch_controller_service(switch_requqest)
 
-                    logger.info(f"Service Call Response to Stop {controller}: {switch_response}")
+                    rospy.loginfo(f"Service Call Response to Stop {controller}: {switch_response}")
 
                 except rospy.ServiceException as e:
-                        logger.error(f"Failed to Stop Controller {controller}:\n {e}")
+                        rospy.logerror(f"Failed to Stop Controller {controller}:\n {e}")
                         continue  # We cannot continue with this controller if we couldn't stop it 
                 
                 stop_request = UnloadControllerRequest()
@@ -268,15 +294,18 @@ class RobotUI(QtWidgets.QMainWindow):
 
                 stop_response = self._unload_controller_service(stop_request)
 
-                logger.info(f"Service Call Response to Unload {controller}: {stop_response}")
+                rospy.loginfo(f"Service Call Response to Unload {controller}: {stop_response}")
 
             except rospy.ServiceException as e:
-                logger.error(f"Failed to Unload Controller {controller}:\n {e}")
+                rospy.logerror(f"Failed to Unload Controller {controller}:\n {e}")
                 break
 
 
 if __name__ == "__main__":
-	app = QtWidgets.QApplication(sys.argv)
-	sift_demo_app = RobotUI()
-	sift_demo_app.show()
-	sys.exit(app.exec_())
+    rospy.init_node('robot_ui')
+    time.sleep(1.0)  # Wait 1.0s for node to be registered
+
+    app = QtWidgets.QApplication(sys.argv)
+    sift_demo_app = RobotUI()
+    sift_demo_app.show()
+    sys.exit(app.exec_())

@@ -13,14 +13,12 @@ ROBOT_TAKEOFF_COMMAND = "/ardrone/takeoff"
 ENABLE_MOTORS_SERVICE = "/enable_motors"
 PUBLISH_RATE = 30  # Rate to publish the drive command to the drone, in Hz
 GO_FORWARD_SERVICE = "/go_forward"
-
-
 ZERO_VECTOR = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
 
 
 class Robot:
     def __init__(self):
-        rospy.on_shutdown(self._shutdown_hook)
+        rospy.on_shutdown(self._shutdown_hook)  # Connect a callback that gets run when this node gets called to shutdown (just a bit of error logging currently)
 
         rospy.loginfo("Robot Brain is initializing!")
 
@@ -28,6 +26,7 @@ class Robot:
         self._cmd_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self._takeoff_publisher = rospy.Publisher('/ardrone/takeoff', Empty, queue_size=1)
 
+        # We are advertising this service
         self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
         
         # Movement
@@ -47,9 +46,9 @@ class Robot:
         """
         rospy.loginfo("Beginning takeoff procedure! Rising...")
 
-        self.set_action(linear=Vector3(0.0, 0.0, 1.0))
+        self.set_action(linear=Vector3(0.0, 0.0, 0.5))
 
-        time.sleep(2.0)
+        time.sleep(0.75)
 
         self.stop()
 
@@ -102,7 +101,7 @@ class Robot:
         Perform a quick "go forward" operation
         """
         rospy.loginfo("Beginning go forward...")
-        
+
         self.set_action(linear=Vector3(1.0, 0.0, 0.0))
 
         time.sleep(1) # 1.0 s
