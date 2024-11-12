@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>350</width>
+    <height>450</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,7 +18,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>420</y>
+      <y>300</y>
       <width>80</width>
       <height>25</height>
      </rect>
@@ -31,7 +31,7 @@
     <property name="geometry">
      <rect>
       <x>110</x>
-      <y>420</y>
+      <y>300</y>
       <width>80</width>
       <height>25</height>
      </rect>
@@ -44,7 +44,7 @@
     <property name="geometry">
      <rect>
       <x>210</x>
-      <y>420</y>
+      <y>300</y>
       <width>80</width>
       <height>25</height>
      </rect>
@@ -53,13 +53,26 @@
      <string>Reset Model</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label">
+   <widget class="QLabel" name="camera_feed">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>40</y>
-      <width>341</width>
-      <height>321</height>
+      <x>0</x>
+      <y>9</y>
+      <width>350</width>
+      <height>270</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>TextLabel</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="state_info">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>340</y>
+      <width>331</width>
+      <height>81</height>
      </rect>
     </property>
     <property name="text">
@@ -72,7 +85,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>350</width>
      <height>22</height>
     </rect>
    </property>
