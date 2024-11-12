@@ -1,6 +1,11 @@
 <launch>
       <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
             <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_plus.gazebo.xacro"/> 
+            <arg name="x" value="4.45"/>
+            <arg name="y" value="-1.70"/>
+            <arg name="z" value="0.1"/>
+            <arg name="R" value="0.0"/>
+            <arg name="P" value="0.0"/>
+            <arg name="Y" value="-3.14"/>
       </include>
-      <!-- <node pkg="robot_controller" type="robot.py" name="robot_brain" output="screen"/> -->
 </launch>
