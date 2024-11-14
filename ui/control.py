@@ -71,7 +71,7 @@ def rot_callback(data):
 rospy.init_node('HectorQ_GUI', anonymous=False)
 
 #Publishers
-vel_pub = rospy.Publisher('/ROBOT_COMMAND_TOPIC', Twist, queue_size=1)
+vel_pub = rospy.Publisher('/robot_state_command', Twist, queue_size=1)
 
 def setText(text):
     ttk.Label(mainframe, text="              ").grid(column=3, row=1, sticky=tk.W)
