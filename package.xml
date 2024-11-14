@@ -69,7 +69,11 @@
   <exec_depend>image_transport</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
 
-  
+  <build_depend>hector_quadrotor_noetic</build_depend>
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>hector_quadrotor_noetic</build_export_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>hector_quadrotor_noetic</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
