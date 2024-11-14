@@ -98,7 +98,7 @@ class RobotUI(QtWidgets.QMainWindow):
 
         # OpenCV stuff
         self._cv_bridge = CvBridge()
-        self._camera_subscriber = rospy.Subscriber(VISION_TOPIC, Image, self._read_camera)
+        self._camera_subscriber = rospy.Subscriber(VISION_TOPIC, Image, self._read_vision)
                 
     def _read_vision(self, msg):
         """
