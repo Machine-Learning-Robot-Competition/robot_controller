@@ -10,6 +10,7 @@ import numpy as np
 import logging
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
+from std_msgs.msg import Int16
 from geometry_msgs.msg import Twist
 import pathlib
 from typing import List
@@ -38,6 +39,9 @@ GO_FORWARD_SERVICE: str = "/go_forward"
 VISION_TOPIC: str = "/robot_brain/vision"
 SET_MODEL_STATE_SERVICE: str = "/gazebo/set_model_state" 
 ROBOT_COMMAND_TOPIC = "/robot_state_command"
+CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
+NUM_GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
+EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 
 # Other Declarations
 ROBOT_PACKAGE_NAME: str = "robot_controller"
@@ -64,7 +68,8 @@ class RobotUI(QtWidgets.QMainWindow):
         loadUi(UI_PATH, self)
 
         self.begin_button.clicked.connect(self.SLOT_begin_button)
-        self.reset_drone.clicked.connect(self.SLOT_reset_drone)
+        self.control_state.clicked.connect(self.SLOT_control_state)
+        self.brain_state.clicked.connect(self.SLOT_brain_state)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
         self.go_forward_button.clicked.connect(self.SLOT_go_forward)
 
@@ -98,11 +103,29 @@ class RobotUI(QtWidgets.QMainWindow):
 
         # OpenCV stuff
         self._cv_bridge = CvBridge()
-        self._camera_subscriber = rospy.Subscriber(VISION_TOPIC, Image, self._read_vision)
+        self._vision_subscriber = rospy.Subscriber(VISION_TOPIC, Image, self._read_vision)
+        self._camera_feed_subscriber = rospy.Subscriber(CAMERA_FEED_TOPIC, Image, self._update_camera_feed)
+        self._extracted_image_subscriber = rospy.Subscriber(EXTRACTED_IMAGE_TOPIC, Image, self._update_extracted_image)
+
+        self._num_good_points = 0
+        self._num_good_points_subscriber = rospy.Subscriber(NUM_GOOD_POINTS_TOPIC, Int16, self._update_good_points)
                 
     def _read_vision(self, msg):
         """
         Callback for the robot vision topic to update our UI with what the robot is seeing
+        """
+        try:
+            cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            pixmap = convert_cv_to_pixmap(cv_image)
+            scaled_pixmap = pixmap.scaled(self.vision_label.size(), aspectRatioMode=True)
+            self.vision_label.setPixmap(scaled_pixmap)
+
+        except Exception as e:
+            rospy.logerr(e)
+
+    def _update_camera_feed(self, msg):
+        """
+        Callback for the camera feed topic to update our UI with what the camera is seeing
         """
         try:
             cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
@@ -113,6 +136,22 @@ class RobotUI(QtWidgets.QMainWindow):
         except Exception as e:
             rospy.logerr(e)
 
+    def _update_good_points(self, num_good_points: Int16):
+        """
+        Update the number of good points that are being detected by SIFT
+        """
+        self.homography_status_text.setText(f"Number of good points identified: {num_good_points.data}")
+
+    def _update_extracted_image(self, msg: Image):
+        try:
+            cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            pixmap = convert_cv_to_pixmap(cv_image)
+            scaled_pixmap = pixmap.scaled(self.sign_label.size(), aspectRatioMode=True)
+            self.sign_label.setPixmap(scaled_pixmap)
+
+        except Exception as e:
+            rospy.logerr(e)
+            
     def _reset_robot_location(self):
         """
         Reset the position of the robot model to the starting position. Also, zero the angular and linear velocity.
@@ -148,8 +187,28 @@ class RobotUI(QtWidgets.QMainWindow):
         """
         Launch the ROS Robot Nodes
         """
-        self._control_node_process, self._control_stdout_thread, self._control_stderr_thread = self._launch_node(self._control_node_process, LAUNCH_CONTROL_NODE_CMD)
+        
+        self._enable_brain()
+        self._enable_control()
+
+        self.begin_button.setEnabled(False)
+
+    def _enable_brain(self):
         self._brain_node_process, self._brain_stdout_thread, self._brain_stderr_thread = self._launch_node(self._brain_node_process, LAUNCH_BRAIN_NODE_CMD)
+        self.brain_state.setText("Kill Brain")
+
+    def _enable_control(self):
+        self._control_node_process, self._control_stdout_thread, self._control_stderr_thread = self._launch_node(self._control_node_process, LAUNCH_CONTROL_NODE_CMD)
+        self.control_state.setText("Kill Control")
+
+    def _kill_control(self):
+        self._kill_node(self._control_node_process, self._control_stdout_thread, self._control_stderr_thread)
+        self.control_state.setText("Enable Control")
+    
+    def _kill_brain(self):
+        self._kill_node(self._brain_node_process, self._brain_stdout_thread, self._brain_stderr_thread)
+        self.brain_state.setText("Enable Brain")
+
 
     def _launch_node(self, process: subprocess.Popen, cmd):
         """
@@ -187,13 +246,6 @@ class RobotUI(QtWidgets.QMainWindow):
             
         else:
             rospy.logerr("Cannot start Robot Node: already started!")
-
-    def _kill_nodes(self): 
-        """
-        Stop the ROS Robot Nodes, if it is running.
-        """           
-        self._kill_node(self._control_node_process, self._control_stdout_thread, self._control_stderr_thread)
-        self._kill_node(self._brain_node_process, self._brain_stdout_thread, self._brain_stderr_thread)
 
     def _kill_node(self, process: subprocess.Popen, stdout_thread: threading.Thread, stderr_thread: threading.Thread):
         """
@@ -244,9 +296,27 @@ class RobotUI(QtWidgets.QMainWindow):
         rospy.loginfo("Trying to begin ROS Node...")
         self._launch_nodes()
 
-    def SLOT_reset_drone(self):
-        rospy.loginfo("Trying to reset drone...")
-        self._kill_nodes()
+    def SLOT_control_state(self):
+        rospy.loginfo("Switching control state...")
+
+        if self.control_state.text() == "Enable Control":
+            self._enable_control()
+            rospy.loginfo("Enabled control!")
+
+        else:
+            self._kill_control()
+            rospy.loginfo("Killed control!")
+
+    def SLOT_brain_state(self):
+        rospy.loginfo("Switching brain state...")
+        
+        if self.brain_state.text() == "Enable Brain":
+            self._enable_brain()
+            rospy.loginfo("Enabled control!")
+
+        else:
+            self._kill_brain()
+            rospy.loginfo("Killed control!")
 
     def SLOT_reset_model(self):
         rospy.loginfo("Trying to Reset Model...")
