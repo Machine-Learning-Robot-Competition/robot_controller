@@ -7,90 +7,158 @@
     <x>0</x>
     <y>0</y>
     <width>600</width>
-    <height>450</height>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QPushButton" name="begin_button">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>300</y>
-      <width>51</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Begin</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="reset_drone">
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>300</y>
-      <width>81</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Reset Drone</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="reset_model">
-    <property name="geometry">
-     <rect>
-      <x>160</x>
-      <y>300</y>
-      <width>80</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Reset Model</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="camera_feed">
+   <widget class="QTabWidget" name="tabWidget">
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>9</y>
-      <width>591</width>
-      <height>270</height>
+      <y>0</y>
+      <width>600</width>
+      <height>600</height>
      </rect>
     </property>
-    <property name="text">
-     <string>TextLabel</string>
+    <property name="currentIndex">
+     <number>0</number>
     </property>
-   </widget>
-   <widget class="QLabel" name="state_info">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>340</y>
-      <width>331</width>
-      <height>81</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="go_forward_button">
-    <property name="geometry">
-     <rect>
-      <x>250</x>
-      <y>300</y>
-      <width>80</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Forward</string>
-    </property>
+    <widget class="QWidget" name="control">
+     <property name="cursor">
+      <cursorShape>ArrowCursor</cursorShape>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::DefaultContextMenu</enum>
+     </property>
+     <attribute name="title">
+      <string>Control</string>
+     </attribute>
+     <widget class="QPushButton" name="begin_button">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>460</y>
+        <width>81</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Begin</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="control_state">
+      <property name="geometry">
+       <rect>
+        <x>100</x>
+        <y>460</y>
+        <width>91</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Enable Control</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="reset_model">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>490</y>
+        <width>81</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Reset Model</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="camera_feed">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>561</width>
+        <height>371</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Camera Feed</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="go_forward_button">
+      <property name="geometry">
+       <rect>
+        <x>200</x>
+        <y>460</y>
+        <width>80</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Forward</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="brain_state">
+      <property name="geometry">
+       <rect>
+        <x>100</x>
+        <y>490</y>
+        <width>91</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Enable Brain</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="vision">
+     <attribute name="title">
+      <string>Vision</string>
+     </attribute>
+     <widget class="QLabel" name="vision_label">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>10</y>
+        <width>571</width>
+        <height>211</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Vision Image</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="sign_label">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>290</y>
+        <width>571</width>
+        <height>241</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Sign Image</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="homography_status_text">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>250</y>
+        <width>311</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Homography Status Text</string>
+      </property>
+     </widget>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
