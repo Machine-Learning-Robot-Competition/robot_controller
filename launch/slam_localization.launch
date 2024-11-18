@@ -8,7 +8,7 @@
 
 
   <!-- Static transform for base_footprint to RGB-D camera link (adjusted height) -->
-  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" args="0 0 0 0 3.1415 0 base_footprint camera_link 5" />
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" args="0 0 0 1.570796327 3.141592654 0.5207963268 base_footprint camera_link 5" />
 
   <!-- RGB-D Mapping Configuration for RTAB-Map -->
   <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
@@ -18,14 +18,24 @@
       <param name="queue_size" type="int" value="100"/>
       <param name="approx_sync" type="bool" value="true"/>
 
-      <!-- Enable Loop Closure and Mapping Features -->
+      <!-- Makes sure the map isn't overriden -->
       <param name="Mem/IncrementalMemory" type="bool" value="false"/>
 
-      <!-- These might not be necessary for localization -->
-      <!-- <param name="Mem/InitWMWithAllNodes" type="bool" value="true"/>
-      <param name="RGBD/ProximityBySpace" type="bool" value="true"/> -->
+      <!-- VISUAL-BASED ENHANCEMENTS -->
+      <!-- Parameters to improve reliance on visual data -->
+      <param name="RGBD/LinearUpdate" type="double" value="0.1"/> <!-- More frequent updates -->
+      <param name="RGBD/AngularUpdate" type="double" value="0.1"/> <!-- More frequent updates -->
+      <param name="Mem/RehearsalSimilarity" type="double" value="0.3"/> <!-- Loosen similarity threshold -->
+      <param name="RGBD/ProximityBySpace" type="bool" value="true"/> <!-- Enable proximity detection by appearance -->
+      <param name="RGBD/OptimizeMaxError" type="double" value="3.0"/> <!-- Relax max error for optimization -->
+      <param name="Kp/MaxFeatures" type="int" value="600"/> <!-- Increase feature count -->
+      <param name="RGBD/OptimizeFromGraphEnd" type="bool" value="true"/> <!-- Optimize map correction -->
       <param name="RGBD/CreateOccupancyGrid" type="bool" value="true"/>
-      <param name="RGBD/CloudMaxDepth" type="double" value="4.0"/>
+      <param name="RGBD/CloudMaxDepth" type="double" value="10.0"/>
+      <!-- End of VISUAL-BASED ENHANCEMENTS -->
+
+      <param name="RGBD/LoopClosureHypothesis" type="double" value="0.05"/> 
+      <param name="Vis/MinInliers" type="int" value="10"/> <!-- Default is 15 -->
 
       <!-- Use separate RGB and Depth topics (disable combined rgbd_image topic) -->
       <param name="subscribe_rgbd" type="bool" value="false"/>
@@ -46,7 +56,7 @@
     <param name="subscribe_depth" type="bool" value="true"/>
     <param name="frame_id" type="string" value="base_footprint"/>
     <param name="wait_for_transform" type="bool" value="true"/>
-    <param name="queue_size" type="int" value="100"/>
+    <param name="queue_size" type="int" value="30"/>
 
 
     <!-- Remap RGB-D topics for visualization without combined rgbd_image topic -->
