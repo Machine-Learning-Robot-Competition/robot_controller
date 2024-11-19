@@ -1,11 +1,15 @@
 <launch>
-      <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
+        <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
             <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_plus.gazebo.xacro"/> 
             <arg name="x" value="4.45"/>
             <arg name="y" value="-1.70"/>
-            <arg name="z" value="0.1"/>
+            <arg name="z" value="0.2"/>
             <arg name="R" value="0.0"/>
             <arg name="P" value="0.0"/>
             <arg name="Y" value="-3.14"/>
-      </include>
+        </include>
+
+        <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization_node">
+            <rosparam command="load" file="$(find robot_controller)/config/ekf.yaml"/>
+        </node>
 </launch>

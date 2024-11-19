@@ -56,7 +56,7 @@ class RobotControlNode:
 
         self.set_action(linear=Vector3(0.0, 0.0, 0.5))
 
-        time.sleep(0.33)
+        time.sleep(1.00)
 
         self.stop()
 
