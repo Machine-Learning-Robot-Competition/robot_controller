@@ -24,6 +24,7 @@ from tf.transformations import quaternion_from_euler
 from cv_utils import convert_cv_to_pixmap
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import traceback
 
 
 # File Paths
@@ -121,7 +122,7 @@ class RobotUI(QtWidgets.QMainWindow):
             self.vision_label.setPixmap(scaled_pixmap)
 
         except Exception as e:
-            rospy.logerr(e)
+            rospy.logerr(f"{e}: {traceback.format_exc()}")
 
     def _update_camera_feed(self, msg):
         """
@@ -134,7 +135,7 @@ class RobotUI(QtWidgets.QMainWindow):
             self.camera_feed.setPixmap(scaled_pixmap)
 
         except Exception as e:
-            rospy.logerr(e)
+            rospy.logerr(f"{e}: {traceback.format_exc()}")
 
     def _update_good_points(self, num_good_points: Int16):
         """
@@ -150,7 +151,7 @@ class RobotUI(QtWidgets.QMainWindow):
             self.sign_label.setPixmap(scaled_pixmap)
 
         except Exception as e:
-            rospy.logerr(e)
+            rospy.logerr(f"{e}: {traceback.format_exc()}")
             
     def _reset_robot_location(self):
         """
