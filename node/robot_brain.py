@@ -9,13 +9,15 @@ import numpy as np
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int16
 from cv_bridge import CvBridge
+import traceback
 
 
-REFERENCE_IMAGE_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "media" / "reference_image.png")  # Image Dimensions: (834, 1390)
+REFERENCE_IMAGE_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "media" / "reference_image.png")  # Image Dimensions: (737, 1098)
 CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 RESULT_PUBLISH_TOPIC: str = "/robot_brain/vision"
 GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
+REFERENCE_IMAGE_DIMENSIONS = (737, 1098)
 
 
 class RobotBrainNode:
@@ -106,14 +108,14 @@ class RobotBrainNode:
             matches = self._flann.knnMatch(self._image_descriptors, desc_grayframe, k=2)
             
             # Put the good matches into a list of good points
-            good_points = [m for m, n in matches if m.distance < 0.6 * n.distance]
+            good_points = [m for m, n in matches if m.distance < 0.65 * n.distance]
             self._good_points_publisber.publish(Int16(len(good_points)))
             
             # Draw lines between the matched good points on the template image and camera image.
             frame = cv2.drawMatches(self._image, self._image_keypoints, grayframe, kp_grayframe, good_points, grayframe)
 
             # If there's enough good points, draw the homography as lines on the image.
-            if len(good_points) > 30:
+            if len(good_points) > 15:
                 query_pts = np.float32([self._image_keypoints[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
                 train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
                 matrix, _ = cv2.findHomography(query_pts, train_pts, cv2.RANSAC, 5.0)
@@ -129,7 +131,10 @@ class RobotBrainNode:
                 frame = cv2.polylines(frame, [np.int32(dst)], True, (255, 0, 0), 3)
 
                 try:
-                    self._extracted_image = self._update_extracted_image(cv_image, matrix)
+                    extracted_image, success = self._update_extracted_image(cv_image, matrix)
+
+                    if success:
+                        self._extracted_image = extracted_image
 
                 except Exception as e:
                     rospy.logerr(e)
@@ -138,9 +143,55 @@ class RobotBrainNode:
             
         except Exception as e:
             rospy.logerr(e)
+
+    def _align_flag(self, image):
+        # Detect edges in the color image using pixel brightness
+        edges = cv2.Canny(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 50, 150)     
+
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Find the largest contour
+        largest_contour = max(contours, key=cv2.contourArea)
+        
+        # Approximate the contour to a polygon
+        epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+        approx = cv2.approxPolyDP(largest_contour, epsilon, True)
+        
+        if len(approx) == 4:  # If a quadrilateral is detected
+            # Reorder the points for perspective transform
+            approx = order_points(approx.reshape(-1, 2))
+            
+            # Define the destination points (aligned rectangle)
+            width = int(max(
+                np.linalg.norm(approx[0] - approx[1]),
+                np.linalg.norm(approx[2] - approx[3])
+            ))
+            height = int(max(
+                np.linalg.norm(approx[1] - approx[2]),
+                np.linalg.norm(approx[3] - approx[0])
+            ))
+            
+            dst_corners = np.float32([
+                [0, 0],
+                [width - 1, 0],
+                [width - 1, height - 1],
+                [0, height - 1]
+            ])
+            
+            # Compute the homography to align the flag
+            H_align = cv2.getPerspectiveTransform(approx, dst_corners)
+            
+            # Warp the color image to align the flag
+            aligned_flag = cv2.warpPerspective(image, H_align, (width, height))
+            return aligned_flag, True
+
+        # Return the original image if no quadrilateral is found
+        return image, False
     
     def _update_extracted_image(self, cv_image, matrix):
-        h, w = 834, 1390
+        success = False
+        h, w = REFERENCE_IMAGE_DIMENSIONS
         corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
 
         # Transform these points using the homography matrix to find the coordinates in the input image
@@ -163,8 +214,33 @@ class RobotBrainNode:
         # Warp the perspective to get the flattened image
         flattened_flag = cv2.warpPerspective(cv_image, H_flattened, (width, height))
 
+        try:
+            flattened_flag, align_success = self._align_flag(flattened_flag)
+            success = align_success
 
-        return flattened_flag
+        except Exception as e:
+            rospy.logerr(f"Error Aligning Image: {e} \n {traceback.format_exc()}")
+
+        return flattened_flag, success
+
+
+def order_points(pts):
+    # Sort by x-coordinates
+    x_sorted = pts[np.argsort(pts[:, 0]), :]
+    
+    # Split into left-most and right-most points
+    left = x_sorted[:2, :]
+    right = x_sorted[2:, :]
+    
+    # Order left-most points by y-coordinates
+    left = left[np.argsort(left[:, 1]), :]
+    (tl, bl) = left  # Top-left, Bottom-left
+    
+    # Order right-most points by y-coordinates
+    right = right[np.argsort(right[:, 1]), :]
+    (tr, br) = right  # Top-right, Bottom-right
+    
+    return np.array([tl, tr, br, bl], dtype="float32")
 
 
 if __name__ == "__main__":

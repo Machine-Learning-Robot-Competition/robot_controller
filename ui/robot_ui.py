@@ -51,6 +51,7 @@ ROBOT_BRAIN_NODE_NAME: str = "robot_brain.py"
 LAUNCH_CONTROL_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_CONTROL_NODE_NAME]
 LAUNCH_BRAIN_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_BRAIN_NODE_NAME]
 CONTROLLERS: List[str] = ["controller/velocity", "controller/attitude"]
+TIME_ELAPSED_UPDATE_PERIOD = 10 # ms
 
 
 with open(CONFIG_PATH) as f:
@@ -110,7 +111,16 @@ class RobotUI(QtWidgets.QMainWindow):
 
         self._num_good_points = 0
         self._num_good_points_subscriber = rospy.Subscriber(NUM_GOOD_POINTS_TOPIC, Int16, self._update_good_points)
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self._update_elapsed_time)
+        self.timer.start(TIME_ELAPSED_UPDATE_PERIOD)  # Update every second
+        self._time_since_update = 0
                 
+    def _update_elapsed_time(self):
+        self._time_since_update += TIME_ELAPSED_UPDATE_PERIOD
+        self.update_label.setText(f"Time Elapsed since Update: {self._time_since_update}ms") 
+
     def _read_vision(self, msg):
         """
         Callback for the robot vision topic to update our UI with what the robot is seeing
@@ -149,6 +159,7 @@ class RobotUI(QtWidgets.QMainWindow):
             pixmap = convert_cv_to_pixmap(cv_image)
             scaled_pixmap = pixmap.scaled(self.sign_label.size(), aspectRatioMode=True)
             self.sign_label.setPixmap(scaled_pixmap)
+            self._time_since_update = 0.0
 
         except Exception as e:
             rospy.logerr(f"{e}: {traceback.format_exc()}")

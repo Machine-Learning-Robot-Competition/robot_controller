@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import rospy
 from geometry_msgs.msg import Twist, Vector3
+from std_msgs.msg import String
 from std_msgs.msg import Empty
 from hector_uav_msgs.srv import EnableMotors
 from robot_controller.srv import GoForward, GoForwardResponse
@@ -14,6 +15,7 @@ ROBOT_TAKEOFF_COMMAND = "/ardrone/takeoff"
 ENABLE_MOTORS_SERVICE = "/enable_motors"
 GO_FORWARD_SERVICE = "/go_forward"
 ROBOT_COMMAND_TOPIC = "/robot_state_command"
+SCORE_TRACKER_TOPIC = "/score_tracker"
 
 # Other Declarations
 ZERO_VECTOR: Vector3 = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
@@ -33,6 +35,7 @@ class RobotControlNode:
         self._cmd_publisher = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
         self._takeoff_publisher = rospy.Publisher(ROBOT_TAKEOFF_COMMAND, Empty, queue_size=1)
         self._command_subscriber = rospy.Subscriber(ROBOT_COMMAND_TOPIC, Twist, callback=self._set_action_callback, queue_size=1)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=1)
 
         # We are advertising this service
         self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
@@ -54,11 +57,23 @@ class RobotControlNode:
         """
         rospy.loginfo("Beginning takeoff procedure! Rising...")
 
+        self._score_tracker_publisher.publish(String("Team4,password,0,NA"))
+
         self.set_action(linear=Vector3(0.0, 0.0, 0.5))
 
         time.sleep(1.00)
 
         self.stop()
+
+        time.sleep(1.00)
+
+        self.set_action(linear=Vector3(1.0, 0.0, 0.0))
+
+        time.sleep(1.00)
+
+        self.stop()
+
+        self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
 
         rospy.loginfo("Takeoff completed! Stopping...")
 
