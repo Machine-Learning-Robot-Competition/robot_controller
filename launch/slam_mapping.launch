@@ -1,11 +1,11 @@
 <launch>
   <!-- Basic parameters -->
   <param name="use_sim_time" type="bool" value="True"/>
-  <arg name="rtabmap_args" default="--delete_db_on_start"/>
-  <!-- <arg name="rtabmap_args" default="-database_path /home/fizzer/.ros/rtabmap.db"/> -->
+  <!-- <arg name="rtabmap_args" default="-delete_db_on_start"/> -->
+  <arg name="rtabmap_args" default="--database_path /home/fizzer/.ros/rtabmap.db"/>
 
   <!-- Static transform for base_footprint to RGB-D camera link (adjusted height) -->
-  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" args="0 0 0 0 3.1415 0 ground_truth/base_footprint camera_link 5" />
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" args="0 0 0 1.570796327 3.141592654 0.5207963268 ground_truth/base_footprint camera_link 5" />
 
   <!-- RGB-D Mapping Configuration for RTAB-Map -->
   <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
@@ -21,7 +21,12 @@
       <param name="Mem/InitWMWithAllNodes" type="bool" value="true"/>
       <param name="RGBD/ProximityBySpace" type="bool" value="true"/>
       <param name="RGBD/CreateOccupancyGrid" type="bool" value="true"/>
-      <param name="RGBD/CloudMaxDepth" type="double" value="4.0"/>
+      <param name="RGBD/CloudMaxDepth" type="double" value="10.0"/>
+      <!-- these control how often loop closures occur -->
+      <param name="RGBD/LoopClosureHypothesis" type="double" value="0.8"/> 
+      <param name="Vis/MinInliers" type="int" value="22"/> <!-- Default is 15 -->
+      <param name="Kp/MaxFeatures" type="int" value="600"/>
+  
 
       <!-- Use separate RGB and Depth topics (disable combined rgbd_image topic) -->
       <param name="subscribe_rgbd" type="bool" value="false"/>
@@ -42,7 +47,7 @@
     <param name="subscribe_depth" type="bool" value="true"/>
     <param name="frame_id" type="string" value="ground_truth/base_footprint"/>
     <param name="wait_for_transform" type="bool" value="true"/>
-    <param name="queue_size" type="int" value="100"/>
+    <param name="queue_size" type="int" value="30"/>
 
     <!-- Remap RGB-D topics for visualization without combined rgbd_image topic -->
     <remap from="rgb/image" to="/B1/rgb_camera/rgb/image_raw"/>
