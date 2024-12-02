@@ -18,7 +18,8 @@ RESULT_PUBLISH_TOPIC: str = "/robot_brain/vision"
 GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 REFERENCE_IMAGE_DIMENSIONS = (737, 1098)
-
+OUTPUT_DIMS = (210, 360)  # Height, Width
+ 
 
 class RobotBrainNode:
     def __init__(self):
@@ -62,14 +63,18 @@ class RobotBrainNode:
         while not rospy.is_shutdown():
             if self._vision is not None:
                 try:
-                    vision_msg = self._cv_bridge.cv2_to_imgmsg(self._vision)
-                    extracted_image_msg = self._cv_bridge.cv2_to_imgmsg(self._extracted_image)
+                    if self._vision is not None:
+                        vision_msg = self._cv_bridge.cv2_to_imgmsg(self._vision)
+                        self._vision_publisber.publish(vision_msg)
 
-                    self._vision_publisber.publish(vision_msg)
-                    self._extracted_image_publisher.publish(extracted_image_msg)
+                    if self._extracted_image is not None:
+                        extracted_image_msg = self._cv_bridge.cv2_to_imgmsg(self._extracted_image)
+                        self._extracted_image_publisher.publish(extracted_image_msg)
+
+                        self._extracted_image = None
 
                 except Exception as e:
-                    rospy.logerr(e)
+                    rospy.logerr(f"{e} {traceback.format_exc()}")
             
             rate.sleep()
 
@@ -91,13 +96,14 @@ class RobotBrainNode:
         Executed upon a shutdown.
         """        
         rospy.loginfo("Shutting down robot brain!")
-        
+    
+    @time_it
     def update(self, msg):
         try:
             cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
 
         except Exception as e:
-            rospy.logerr(e)
+            rospy.logerr(f"{e} {traceback.format_exc()}")
 
         try: 
             # Convert the image to grayscale, then use SIFT to grab its key points.
@@ -120,7 +126,7 @@ class RobotBrainNode:
                 train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
                 matrix, _ = cv2.findHomography(query_pts, train_pts, cv2.RANSAC, 5.0)
                             
-                h, w = self._image.shape
+                h, w, _ = self._image.shape
                 pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
                 dst = cv2.perspectiveTransform(pts, matrix)
 
@@ -137,12 +143,12 @@ class RobotBrainNode:
                         self._extracted_image = extracted_image
 
                 except Exception as e:
-                    rospy.logerr(e)
+                    rospy.logerr(f"{e} {traceback.format_exc()}")
 
             self._vision = frame
             
         except Exception as e:
-            rospy.logerr(e)
+            rospy.logerr(f"{e} {traceback.format_exc()}")
 
     def _align_flag(self, image):
         # Detect edges in the color image using pixel brightness
@@ -184,11 +190,15 @@ class RobotBrainNode:
             
             # Warp the color image to align the flag
             aligned_flag = cv2.warpPerspective(image, H_align, (width, height))
-            return aligned_flag, True
+
+            aligned_flag_resized = cv2.resize(aligned_flag, (360, 210))
+
+            return aligned_flag_resized, True
 
         # Return the original image if no quadrilateral is found
         return image, False
     
+    @time_it
     def _update_extracted_image(self, cv_image, matrix):
         success = False
         h, w = REFERENCE_IMAGE_DIMENSIONS
