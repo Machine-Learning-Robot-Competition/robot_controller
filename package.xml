@@ -55,6 +55,10 @@
   <build_export_depend>hector_quadrotor_noetic</build_export_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>hector_quadrotor_noetic</exec_depend>
+  <build_depend>actionlib_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>actionlib_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
