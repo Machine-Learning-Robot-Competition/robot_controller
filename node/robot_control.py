@@ -35,7 +35,7 @@ class RobotControlNode:
         self._cmd_publisher = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
         self._takeoff_publisher = rospy.Publisher(ROBOT_TAKEOFF_COMMAND, Empty, queue_size=1)
         self._command_subscriber = rospy.Subscriber(ROBOT_COMMAND_TOPIC, Twist, callback=self._set_action_callback, queue_size=1)
-        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=1)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
 
         # We are advertising this service
         self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
@@ -57,21 +57,25 @@ class RobotControlNode:
         """
         rospy.loginfo("Beginning takeoff procedure! Rising...")
 
+        time.sleep(1.00)
+
         self._score_tracker_publisher.publish(String("Team4,password,0,NA"))
 
-        self.set_action(linear=Vector3(0.0, 0.0, 0.5))
-
         time.sleep(1.00)
+
+        self.set_action(linear=Vector3(0.0, 0.0, 0.25))
+
+        time.sleep(0.50)
 
         self.stop()
 
-        time.sleep(1.00)
+        # time.sleep(1.00)
 
-        self.set_action(linear=Vector3(1.0, 0.0, 0.0))
+        # self.set_action(linear=Vector3(1.0, 0.0, 0.0))
 
-        time.sleep(1.00)
+        # time.sleep(2.00)
 
-        self.stop()
+        # self.stop()
 
         self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
 
@@ -195,6 +199,8 @@ if __name__ == "__main__":
     time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_control_node = RobotControlNode()
+
+    time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_control_node.takeoff()
 

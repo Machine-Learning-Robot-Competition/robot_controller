@@ -1,7 +1,7 @@
 # Empty Request
 ---
-# Success
-bool clueboard_lock_success
----
 # Clueboard Result
 string[2] clueboard_text
+---
+# Success
+bool clueboard_lock_success

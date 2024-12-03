@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="control">
      <property name="cursor">
@@ -114,6 +114,19 @@
        <string>Enable Brain</string>
       </property>
      </widget>
+     <widget class="QPushButton" name="vision_button">
+      <property name="geometry">
+       <rect>
+        <x>200</x>
+        <y>490</y>
+        <width>80</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>See</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="vision">
      <attribute name="title">
@@ -169,6 +182,37 @@
       </property>
       <property name="text">
        <string>Update Label</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>Text</string>
+     </attribute>
+     <widget class="QLabel" name="threshold_image">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>461</width>
+        <height>211</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="contours_image">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>240</y>
+        <width>561</width>
+        <height>281</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
       </property>
      </widget>
     </widget>

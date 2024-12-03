@@ -1,15 +1,21 @@
 #! /usr/bin/env python3
 
+import tensorflow as tf
+import cv2
+
 import threading
 import rospy
 import time
 import pathlib
-import cv2
 import numpy as np
 from sensor_msgs.msg import Image
-from std_msgs.msg import Int16
+from std_msgs.msg import Int16, Empty, Bool, String
 from cv_bridge import CvBridge
+from cv_utils import time_it, extract_blue, extract_contours, extract_letters, pad_to_size, pad_image_collection, identify_spaces, collect_words, ColorImage, FlatImage
 import traceback
+from typing import List, Tuple
+import actionlib
+from robot_controller.msg import ReadClueboardAction, ReadClueboardFeedback, ReadClueboardResult, ReadClueboardGoal
 
 
 REFERENCE_IMAGE_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "media" / "reference_image.png")  # Image Dimensions: (737, 1098)
@@ -17,9 +23,21 @@ CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 RESULT_PUBLISH_TOPIC: str = "/robot_brain/vision"
 GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
+LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
 REFERENCE_IMAGE_DIMENSIONS = (737, 1098)
 OUTPUT_DIMS = (210, 360)  # Height, Width
- 
+MAX_ATTEMPTS = 30
+DEBUG = True
+
+encoding = {
+    "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9,
+    "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18,
+    "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25
+}
+
+
+reversed_encoding = {value: key for key, value in encoding.items()}
+
 
 class RobotBrainNode:
     def __init__(self):
@@ -41,43 +59,41 @@ class RobotBrainNode:
         self._vision = None
         self._extracted_image = None
 
-        self._camera_subscriber = rospy.Subscriber(CAMERA_FEED_TOPIC, Image, self.update, queue_size=1)
+        self._server = actionlib.SimpleActionServer(
+            'read_clueboard', 
+            ReadClueboardAction, 
+            self._read_clueboard, 
+            False
+        )
+        self._server.start()
+
         self._vision_publisber = rospy.Publisher(RESULT_PUBLISH_TOPIC, Image, queue_size=1)
+        self._letters_publisher = rospy.Publisher(LETTERS_PUBLISH_TOPIC, Image, queue_size=1)
         self._extracted_image_publisher = rospy.Publisher(EXTRACTED_IMAGE_TOPIC, Image, queue_size=1)
         self._good_points_publisber = rospy.Publisher(GOOD_POINTS_TOPIC, Int16, queue_size=1)
 
-        # Start a thread to run a loop that will publish to the vision topic with what we are seeing
-        self._publish_thread = threading.Thread(target=self._publish_command, args=(self._publish_rate, ))
-        self._publish_thread.start()
+        self._model = tf.keras.models.load_model("/home/joshua/enph353_ws/src/robot_controller/models/tfjenvf.keras")
 
         rospy.loginfo("Brain Initialized!")
 
-    def _publish_command(self, frequency):
-        """
-        This is a blocking method. Infinitely loop at `frequency` Hz, publishing our vision.
+    def _read_clueboard(self, goal: ReadClueboardGoal):
+        feedback = ReadClueboardFeedback()
+        result = ReadClueboardResult()
 
-        :param int frequency: the publishing frequency, in Hz
-        """        
-        rate = rospy.Rate(frequency)
+        success, padded_letters, spaces = self.see()
+        feedback.clueboard_lock_success = success
+        self._server.publish_feedback(feedback)
 
-        while not rospy.is_shutdown():
-            if self._vision is not None:
-                try:
-                    if self._vision is not None:
-                        vision_msg = self._cv_bridge.cv2_to_imgmsg(self._vision)
-                        self._vision_publisber.publish(vision_msg)
+        if success:
+            clue_type, clue_value = self.read(padded_letters, spaces)
+            rospy.loginfo(f"Setting result to: {clue_type}: {clue_value}")
 
-                    if self._extracted_image is not None:
-                        extracted_image_msg = self._cv_bridge.cv2_to_imgmsg(self._extracted_image)
-                        self._extracted_image_publisher.publish(extracted_image_msg)
+            result.clueboard_text = [clue_type, clue_value]
+            self._server.set_succeeded(result)
 
-                        self._extracted_image = None
-
-                except Exception as e:
-                    rospy.logerr(f"{e} {traceback.format_exc()}")
-            
-            rate.sleep()
-
+        else:
+            rospy.loginfo("Aborting clueboard read!")
+            self._server.set_aborted(result)
     
     def _prepare_reference_image(self):
         """
@@ -96,59 +112,135 @@ class RobotBrainNode:
         Executed upon a shutdown.
         """        
         rospy.loginfo("Shutting down robot brain!")
+
+    def process_image(self, cv_image: np.ndarray, image: np.ndarray, image_keypoints, image_descriptors):
+        # Convert the image to grayscale, then use SIFT to grab its key points.
+        grayframe = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+        kp_grayframe, desc_grayframe = self._sift.detectAndCompute(grayframe, None)
+
+        # Match the key points to the template image.
+        matches = self._flann.knnMatch(image_descriptors, desc_grayframe, k=2)
+        
+        # Put the good matches into a list of good points
+        good_points = [m for m, n in matches if m.distance < 0.65 * n.distance]
+        
+        # Draw lines between the matched good points on the template image and camera image.
+        frame = cv2.drawMatches(image, image_keypoints, grayframe, kp_grayframe, good_points, grayframe)
+
+        return good_points, frame, kp_grayframe
     
-    @time_it
-    def update(self, msg):
+    @staticmethod
+    def get_homography(good_points, kp_grayframe, image: np.ndarray, image_keypoints, frame):
+        query_pts = np.float32([image_keypoints[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
+        train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
+        matrix, _ = cv2.findHomography(query_pts, train_pts, cv2.RANSAC, 5.0)
+        
         try:
-            cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            h, w = image.shape
+        except:
+            h, w, _ = image.shape
 
-        except Exception as e:
-            rospy.logerr(f"{e} {traceback.format_exc()}")
+        pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
+        dst = cv2.perspectiveTransform(pts, matrix)
 
-        try: 
-            # Convert the image to grayscale, then use SIFT to grab its key points.
-            grayframe = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-            kp_grayframe, desc_grayframe = self._sift.detectAndCompute(grayframe, None)
+        # We need to add the width of self._image to offset where the lines 
+        # get drawn to compensate for self._image being drawn to the left!
+        dst[:, :, 0] += w
 
-            # Match the key points to the template image.
-            matches = self._flann.knnMatch(self._image_descriptors, desc_grayframe, k=2)
-            
-            # Put the good matches into a list of good points
-            good_points = [m for m, n in matches if m.distance < 0.65 * n.distance]
-            self._good_points_publisber.publish(Int16(len(good_points)))
-            
-            # Draw lines between the matched good points on the template image and camera image.
-            frame = cv2.drawMatches(self._image, self._image_keypoints, grayframe, kp_grayframe, good_points, grayframe)
+        frame = cv2.polylines(frame, [np.int32(dst)], True, (255, 0, 0), 3)
 
-            # If there's enough good points, draw the homography as lines on the image.
-            if len(good_points) > 15:
-                query_pts = np.float32([self._image_keypoints[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
-                train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
-                matrix, _ = cv2.findHomography(query_pts, train_pts, cv2.RANSAC, 5.0)
-                            
-                h, w, _ = self._image.shape
-                pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
-                dst = cv2.perspectiveTransform(pts, matrix)
+        return frame, matrix        
 
-                # We need to add the width of self._image to offset where the lines 
-                # get drawn to compensate for self._image being drawn to the left!
-                dst[:, :, 0] += w
+    def see(self):
+        attempts = 0
+        while attempts < MAX_ATTEMPTS:
+            rospy.loginfo(f"Beginning attempt at getting homography {attempts}...")
 
-                frame = cv2.polylines(frame, [np.int32(dst)], True, (255, 0, 0), 3)
+            try:
+                msg = rospy.wait_for_message(CAMERA_FEED_TOPIC, Image, timeout=5)
+                cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
 
-                try:
+                good_points, frame, kp_grayframe = self.process_image(cv_image, self._image, self._image_keypoints, self._image_descriptors)
+                self._good_points_publisber.publish(Int16(len(good_points)))
+
+                if len(good_points) > 15:
+                    frame, matrix = self.get_homography(good_points, kp_grayframe, self._image, self._image_keypoints, frame)
+
                     extracted_image, success = self._update_extracted_image(cv_image, matrix)
 
                     if success:
-                        self._extracted_image = extracted_image
+                        extracted_image_msg = self._cv_bridge.cv2_to_imgmsg(extracted_image)
+                        self._extracted_image_publisher.publish(extracted_image_msg)
 
-                except Exception as e:
-                    rospy.logerr(f"{e} {traceback.format_exc()}")
+                        rospy.loginfo("Successfully acquired homography!")
+                        break
 
-            self._vision = frame
+                vision_msg = self._cv_bridge.cv2_to_imgmsg(frame)
+                self._vision_publisber.publish(vision_msg)
+
+            except Exception as e:
+                rospy.logerr(f"{e} {traceback.format_exc()}")
+                return False, None, None
             
+        else:
+            rospy.logerr(f"Failed to find homography after {MAX_ATTEMPTS} attempts!")
+            return False, None, None
+
+        try:
+            blue_image: FlatImage = extract_blue(extracted_image)
+            if DEBUG: 
+                cv2.imwrite("./blue_image.png", blue_image)
+
+            contours: List[np.ndarray] = extract_contours(blue_image)
+            rospy.loginfo(f"Found contours: {len(contours)}")
+            if DEBUG:
+                output_image = extracted_image.copy()
+                cv2.drawContours(output_image, contours, -1, (0, 255, 0), 2)  
+                cv2.imwrite("./output_image.png", output_image)
+
+            letters: List[FlatImage] = extract_letters(blue_image, contours)
+            if DEBUG:
+                for i, letter in enumerate(letters):
+                    cv2.imwrite(f"./letters/{i}.png", letter)
+
+            try:
+                padded_letters: List[FlatImage] = pad_image_collection(letters, target_shape=(40, 35))
+                spaces: List[Tuple[int, int]] = identify_spaces(contours, minimum_distance=20.0)
+
+                if DEBUG:
+                    banner_image = np.hstack(padded_letters)
+                    cv2.imwrite("./banner_image.png", banner_image)
+
+                return True, padded_letters, spaces
+
+            except Exception as e:
+                rospy.logerr(f"{e} {traceback.format_exc()}")
+
+            letters_msg = self._cv_bridge.cv2_to_imgmsg(output_image)
+            self._letters_publisher.publish(letters_msg)
+
         except Exception as e:
             rospy.logerr(f"{e} {traceback.format_exc()}")
+            return False, None, None
+
+    def read(self, letters, spaces):
+        word_images: List[List[FlatImage]] = collect_words(letters, spaces)
+
+        try:
+            words: List[str] = [''.join([self.predict(letter) for letter in word]) for word in word_images]
+            clue_type = words[0]
+            clue_value = ' '.join(words[1:])
+        except Exception as e:
+            rospy.logerr(f"{e} {traceback.format_exc()}")
+        
+        return clue_type, clue_value
+        
+    
+    def predict(self, X_data):
+        reshaped = X_data.reshape(40, 35)
+        input_data = np.expand_dims(reshaped, axis=0)
+        result = self._model.predict(input_data)
+        return reversed_encoding[np.argmax(result[0])]
 
     def _align_flag(self, image):
         # Detect edges in the color image using pixel brightness

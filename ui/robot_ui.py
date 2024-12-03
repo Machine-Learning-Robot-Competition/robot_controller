@@ -10,21 +10,22 @@ import numpy as np
 import logging
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
-from std_msgs.msg import Int16
+from std_msgs.msg import Int16, Bool
 from geometry_msgs.msg import Twist
 import pathlib
 from typing import List
 from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, LoadController, UnloadController, LoadControllerRequest, UnloadControllerRequest
-from robot_controller.srv import GoForward, GoForwardRequest
 import subprocess
 import os
 import toml
 import pprint
 from tf.transformations import quaternion_from_euler
-from cv_utils import convert_cv_to_pixmap
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import traceback
+import actionlib
+from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
+import cv2
 
 
 # File Paths
@@ -43,6 +44,7 @@ ROBOT_COMMAND_TOPIC = "/robot_state_command"
 CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 NUM_GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
+LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
 
 # Other Declarations
 ROBOT_PACKAGE_NAME: str = "robot_controller"
@@ -64,6 +66,24 @@ initial_conditions: dict = robot_config["initial_conditions"]
 robot_model_name: str = robot_config["info"]["model_name"]
 
 
+# Source: stackoverflow.com/questions/34232632/
+def convert_cv_to_pixmap(cv_img: np.ndarray) -> QtGui.QPixmap:
+    """
+    Convert an OpenCV-compatible ndarray to a Qt-compatible Pixmap.
+
+    @param np.ndarray cv_img: OpenCV-compatible ndarray that will be converted.
+    @return the `cv_img` converted to a Qt-compatible PixmapQt-compatible Pixmap.
+    """
+    try:
+        height, width, channel = cv_img.shape
+    except Exception as e:
+        height, width = cv_img.shape
+        channel = 1
+
+    bytesPerLine = channel * width
+    q_img = QtGui.QImage(cv_img.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888)
+    return QtGui.QPixmap.fromImage(q_img)
+
 class RobotUI(QtWidgets.QMainWindow):
     def __init__(self):
         super(RobotUI, self).__init__()
@@ -74,6 +94,7 @@ class RobotUI(QtWidgets.QMainWindow):
         self.brain_state.clicked.connect(self.SLOT_brain_state)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
         self.go_forward_button.clicked.connect(self.SLOT_go_forward)
+        self.vision_button.clicked.connect(self.SLOT_vision_button)
 
         # We want to run our robot brain and control nodes, so we will start two new processes for each
         # Each will also have two threads to capture their stdout and stderr and pipe it back to this main process
@@ -99,6 +120,8 @@ class RobotUI(QtWidgets.QMainWindow):
         rospy.wait_for_service(SET_MODEL_STATE_SERVICE)
         self._set_model_state = rospy.ServiceProxy(SET_MODEL_STATE_SERVICE, SetModelState, persistent=True)
 
+        self._read_clueboard_client = actionlib.SimpleActionClient('read_clueboard', ReadClueboardAction)
+
         # Publisher to publish commands to the robot command topic (robot_control reads this topic, and updates cmd_vel with it continuously)
         self._command_publisher = rospy.Publisher(ROBOT_COMMAND_TOPIC, Twist, queue_size=1)
         self._going_forward = False
@@ -108,6 +131,7 @@ class RobotUI(QtWidgets.QMainWindow):
         self._vision_subscriber = rospy.Subscriber(VISION_TOPIC, Image, self._read_vision)
         self._camera_feed_subscriber = rospy.Subscriber(CAMERA_FEED_TOPIC, Image, self._update_camera_feed)
         self._extracted_image_subscriber = rospy.Subscriber(EXTRACTED_IMAGE_TOPIC, Image, self._update_extracted_image)
+        self._letters_subscriber = rospy.Subscriber(LETTERS_PUBLISH_TOPIC, Image, self._update_letters)
 
         self._num_good_points = 0
         self._num_good_points_subscriber = rospy.Subscriber(NUM_GOOD_POINTS_TOPIC, Int16, self._update_good_points)
@@ -116,10 +140,27 @@ class RobotUI(QtWidgets.QMainWindow):
         self.timer.timeout.connect(self._update_elapsed_time)
         self.timer.start(TIME_ELAPSED_UPDATE_PERIOD)  # Update every second
         self._time_since_update = 0
+
+    def SLOT_vision_button(self):
+        rospy.loginfo("Sending read clueboard...")
+        self._send_read_clueboard()
                 
     def _update_elapsed_time(self):
         self._time_since_update += TIME_ELAPSED_UPDATE_PERIOD
         self.update_label.setText(f"Time Elapsed since Update: {self._time_since_update}ms") 
+
+    def _send_read_clueboard(self):
+        self._read_clueboard_client.wait_for_server()
+
+        goal = ReadClueboardGoal()
+        self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback, done_cb=self._read_clueboard_done_cb)
+
+    def _read_clueboard_callback(self, feedback: ReadClueboardFeedback):
+        rospy.loginfo(feedback.clueboard_lock_success)
+
+    def _read_clueboard_done_cb(self, state, result: ReadClueboardResult):
+        print(type(state))
+        rospy.loginfo(result.clueboard_text)
 
     def _read_vision(self, msg):
         """
@@ -147,6 +188,16 @@ class RobotUI(QtWidgets.QMainWindow):
         except Exception as e:
             rospy.logerr(f"{e}: {traceback.format_exc()}")
 
+    def _update_letters(self, msg):
+        try:
+            cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            cv2.imwrite("./image.png", cv_image)
+            threshold_image = convert_cv_to_pixmap(cv_image).scaled(self.threshold_image.size(), aspectRatioMode=True)
+            self.threshold_image.setPixmap(threshold_image)
+
+        except Exception as e:
+            rospy.logerr(f"{e}: {traceback.format_exc()}")
+
     def _update_good_points(self, num_good_points: Int16):
         """
         Update the number of good points that are being detected by SIFT
@@ -156,6 +207,8 @@ class RobotUI(QtWidgets.QMainWindow):
     def _update_extracted_image(self, msg: Image):
         try:
             cv_image: np.ndarray = self._cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            
+            # Display the sign
             pixmap = convert_cv_to_pixmap(cv_image)
             scaled_pixmap = pixmap.scaled(self.sign_label.size(), aspectRatioMode=True)
             self.sign_label.setPixmap(scaled_pixmap)
@@ -418,5 +471,11 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
     sift_demo_app = RobotUI()
+
+    # def shutdown():
+    #     exit()
+
+    # rospy.on_shutdown(lambda: shutdown())  # Connect a callback that gets run when this node gets called to shutdown (just a bit of error logging currently)
+
     sift_demo_app.show()
     sys.exit(app.exec_())
