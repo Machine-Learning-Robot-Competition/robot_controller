@@ -13,7 +13,7 @@ import math
 import rospy
 
 
-speed = 0.5
+speed = 0.3
 speed_angular = 0.8
 
 

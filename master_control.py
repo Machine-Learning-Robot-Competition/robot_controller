@@ -3,11 +3,14 @@
 import rospy
 import threading
 from std_msgs.msg import Float64MultiArray, Bool
+import numpy as np
 
 # Hardcoded goals dictionary
 goals = {
     "sign_top_middle": [0, 0, 0, 3.1415],
-    "sign_top_left": [0.5, 0.5, 0, 4.4]
+    "sign_top_left": [1, 1, 0, np.pi / 2]
+    "sign_top_left": [1, 1, 0, np.pi / 2],
+
 }
 
 class MasterController:
