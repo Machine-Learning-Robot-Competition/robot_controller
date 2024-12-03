@@ -1,14 +1,14 @@
 <launch>
-        <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
+      <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch" >
             <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_plus.gazebo.xacro"/> 
-            <arg name="x" value="4.45"/>
-            <arg name="y" value="-1.70"/>
+            <arg name="x" value="5.5"/> <!-- 4.50  -->
+            <arg name="y" value="2.5"/> <!-- -1.70 -->
             <arg name="z" value="0.2"/>
             <arg name="R" value="0.0"/>
             <arg name="P" value="0.0"/>
-            <arg name="Y" value="-3.14"/>
-      </include>
-      
+            <arg name="Y" value="-1.57"/> <!-- -3.14 -->
+     </include>
+
       <include file="$(find robot_controller)/launch/slam_localization.launch">
       </include>
 </launch>
