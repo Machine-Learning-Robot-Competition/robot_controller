@@ -4,6 +4,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Vector3Stamped, Point, Quaternion
 from sensor_msgs.msg import Imu
 import tf
+import numpy as np
 
 class OdometryPublisher:
     def __init__(self):
@@ -58,6 +59,9 @@ class OdometryPublisher:
         # Update theta (orientation) from angular velocity
         self.theta += self.vth * dt  # Integrate angular velocity
 
+        self.theta = (self.theta + np.pi) % (2 * np.pi) - np.pi #constrain theta to be form -pi to pi
+
+
         # Create odometry message
         odom = Odometry()
         odom.header.stamp = current_time
@@ -80,9 +84,9 @@ class OdometryPublisher:
         self.odom_pub.publish(odom)
         
         # Broadcast the transform
-        rospy.loginfo(f"Broadcasting transform: base_footprint -> odom_custom")
-        rospy.loginfo(f"Position: {self.x}, {self.y}, {self.z}")
-        rospy.loginfo(f"Rotation: {self.theta}")
+        # rospy.loginfo(f"Broadcasting transform: base_footprint -> odom_custom")
+        # rospy.loginfo(f"Position: {self.x}, {self.y}, {self.z}")
+        # rospy.loginfo(f"Rotation: {self.theta}")
 
         self.br.sendTransform(
             (self.x, self.y, self.z),  # Updated to broadcast z position
