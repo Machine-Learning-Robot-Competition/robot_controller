@@ -7,9 +7,8 @@
             <arg name="R" value="0.0"/>
             <arg name="P" value="0.0"/>
             <arg name="Y" value="-3.14"/>
-        </include>
-
-        <!-- <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization_node">
-            <rosparam command="load" file="$(find robot_controller)/config/ekf.yaml"/>
-        </node> -->
+      </include>
+      
+      <include file="$(find robot_controller)/launch/slam_localization.launch">
+      </include>
 </launch>

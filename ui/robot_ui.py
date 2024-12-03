@@ -15,6 +15,7 @@ from geometry_msgs.msg import Twist
 import pathlib
 from typing import List
 from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, LoadController, UnloadController, LoadControllerRequest, UnloadControllerRequest
+from robot_controller.srv import GoForward, GoForwardRequest, GoForwardResponse
 import subprocess
 import os
 import toml
@@ -236,6 +237,7 @@ class RobotUI(QtWidgets.QMainWindow):
         msg.twist.angular.y = 0.0
         msg.twist.angular.z = 0.0
 
+
         try:
             resp = self._set_model_state(msg)
             
@@ -323,7 +325,7 @@ class RobotUI(QtWidgets.QMainWindow):
             self._kill_brain()
             rospy.loginfo("Killed control!")
 
-    def SLOT_reset_model(self):
+    def SLOT_reset_model(self, arg = None):
         rospy.loginfo("Trying to Reset Model...")
 
         self._unload_controllers()  # Stop the controllers to try to avoid weird PID stuff
@@ -333,6 +335,8 @@ class RobotUI(QtWidgets.QMainWindow):
         self._load_controllers()  # Restart controllers after a brief pause to try to avoid weird PID stuff
 
         rospy.loginfo("Model Reset!")
+        
+        return GoForwardResponse()
 
     def SLOT_go_forward(self):
         rospy.loginfo("Trying to go forward...")
