@@ -10,7 +10,7 @@ import numpy as np
 import logging
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
-from std_msgs.msg import Int16, Bool
+from std_msgs.msg import Int16, Bool, String
 from geometry_msgs.msg import Twist
 import pathlib
 from typing import List
@@ -30,6 +30,9 @@ from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClu
 import cv2
 
 
+# Make sure this is True for competition!
+COMPETITION_RULES: bool = False
+
 # File Paths
 UI_PATH = pathlib.Path(__file__).parent / "main.ui"
 CONFIG_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "config" / "robot.toml")
@@ -47,6 +50,7 @@ CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 NUM_GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
+SCORE_TRACKER_TOPIC = "/score_tracker"
 
 # Other Declarations
 ROBOT_PACKAGE_NAME: str = "robot_controller"
@@ -56,7 +60,7 @@ NAVIGATION_CONTROLLER_NAME: str = "navigation_controller.py"
 MASTER_CONTROLLER_NAME: str = "master_control.py"
 CONTROLLERS: List[str] = ["controller/velocity", "controller/attitude"]
 TIME_ELAPSED_UPDATE_PERIOD = 10 # ms
-
+COMPETITION_TIME_MS = 5 * 1000
 
 with open(CONFIG_PATH) as f:
     robot_config = toml.load(f)
@@ -131,6 +135,7 @@ class RobotUI(QtWidgets.QMainWindow):
         self._camera_feed_subscriber = rospy.Subscriber(CAMERA_FEED_TOPIC, Image, self._update_camera_feed)
         self._extracted_image_subscriber = rospy.Subscriber(EXTRACTED_IMAGE_TOPIC, Image, self._update_extracted_image)
         self._letters_subscriber = rospy.Subscriber(LETTERS_PUBLISH_TOPIC, Image, self._update_letters)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
 
         self._num_good_points = 0
         self._num_good_points_subscriber = rospy.Subscriber(NUM_GOOD_POINTS_TOPIC, Int16, self._update_good_points)
@@ -138,7 +143,16 @@ class RobotUI(QtWidgets.QMainWindow):
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self._update_elapsed_time)
         self.timer.start(TIME_ELAPSED_UPDATE_PERIOD)  # Update every second
+
+        self._world_timer = QtCore.QTimer(self)
+        self._world_timer.timeout.connect(self._stop_world)
+
         self._time_since_update = 0
+
+    def _stop_world(self):
+        self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
+
+        self._takedown_nodes()
 
     def SLOT_vision_button(self):
         rospy.loginfo("Sending read clueboard...")
@@ -255,8 +269,21 @@ class RobotUI(QtWidgets.QMainWindow):
         
         self._enable_brain()
         self._enable_control()
+        # self._enable_nav()
+
+        time.sleep(3)  # Nodes wait 3 seconds before actually beginning
+
+        self._score_tracker_publisher.publish(String("Team4,password,0,NA"))    
+        # If we're doing competition, ensure we stop after the time is over, otherwise don't stop training
+        if COMPETITION_RULES:
+            self._world_timer.start(COMPETITION_TIME_MS)  # Update every second
 
         self.begin_button.setEnabled(False)
+    
+    def _takedown_nodes(self):
+        self._kill_brain()
+        self._kill_control()
+        # self._kill_nav()
 
     def _enable_brain(self):
         self._brain_node.start()
