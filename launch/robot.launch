@@ -8,4 +8,6 @@
             <arg name="P" value="0.0"/>
             <arg name="Y" value="-3.14"/>
       </include>
+      <include file="$(find robot_controller)/launch/slam_localization.launch">
+      </include>
 </launch>
