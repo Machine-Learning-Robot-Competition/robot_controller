@@ -1,4 +1,7 @@
-from .node_utils import NodeThread
+from .node_utils import (
+    NodeThread,
+    PIDController
+)
 from .cv_utils import (
     time_it,
     extract_blue,
@@ -15,6 +18,7 @@ from .cv_utils import (
 
 __all__ = [
     "NodeThread",
+    "PIDController",
     "pad_image_collection",
     "pad_to_size",
     "time_it",
