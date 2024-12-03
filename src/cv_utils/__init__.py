@@ -1,7 +1,3 @@
-from ._convert import (
-    convert_cv_to_pixmap
-)
-
 from ._timing import (
     time_it
 )

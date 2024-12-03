@@ -33,7 +33,7 @@ def extract_contours(image: FlatImage) -> List[np.ndarray]:
 
     # I don't like this either
     try:
-        height, width, channels = image.shape
+        height, width, _ = image.shape
     except Exception:
         height, width = image.shape
 
@@ -66,6 +66,7 @@ def extract_letters(image: FlatImage, contours: List[np.ndarray]) -> List[FlatIm
         # Store the processed letter
         processed_letters.append(cropped)
 
+    return processed_letters
 
 def pad_to_size(array, target_shape=(40, 40), fill_value=0) -> FlatImage:
     """
