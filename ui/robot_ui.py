@@ -24,6 +24,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import traceback
 import actionlib
+from node_utils import NodeThread
 from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
 import cv2
 
@@ -96,14 +97,9 @@ class RobotUI(QtWidgets.QMainWindow):
         self.go_forward_button.clicked.connect(self.SLOT_go_forward)
         self.vision_button.clicked.connect(self.SLOT_vision_button)
 
-        # We want to run our robot brain and control nodes, so we will start two new processes for each
-        # Each will also have two threads to capture their stdout and stderr and pipe it back to this main process
-        self._control_node_process: subprocess.Popen = None
-        self._control_stdout_thread: threading.Thread = None
-        self._control_stderr_thread: threading.Thread = None
-        self._brain_node_process: subprocess.Popen = None
-        self._brain_stdout_thread: threading.Thread = None
-        self._brain_stderr_thread: threading.Thread = None
+        # Handlers that wrap nodes running in subprocesses
+        self._control_node: NodeThread = NodeThread(ROBOT_CONTROL_NODE_NAME)
+        self._brain_node: NodeThread = NodeThread(ROBOT_BRAIN_NODE_NAME)
                 
         # We can use controller services to load and unload controllers
         # Controllers are what the drone uses to control itself. We need to unload and reload them when resetting the model position
@@ -259,76 +255,20 @@ class RobotUI(QtWidgets.QMainWindow):
         self.begin_button.setEnabled(False)
 
     def _enable_brain(self):
-        self._brain_node_process, self._brain_stdout_thread, self._brain_stderr_thread = self._launch_node(self._brain_node_process, LAUNCH_BRAIN_NODE_CMD)
+        self._brain_node.start()
         self.brain_state.setText("Kill Brain")
 
     def _enable_control(self):
-        self._control_node_process, self._control_stdout_thread, self._control_stderr_thread = self._launch_node(self._control_node_process, LAUNCH_CONTROL_NODE_CMD)
+        self._control_node.start()
         self.control_state.setText("Kill Control")
 
     def _kill_control(self):
-        self._kill_node(self._control_node_process, self._control_stdout_thread, self._control_stderr_thread)
+        self._control_node.kill()
         self.control_state.setText("Enable Control")
     
     def _kill_brain(self):
-        self._kill_node(self._brain_node_process, self._brain_stdout_thread, self._brain_stderr_thread)
+        self._brain_node.kill()
         self.brain_state.setText("Enable Brain")
-
-
-    def _launch_node(self, process: subprocess.Popen, cmd):
-        """
-        Try to launch a node, if it doesn't already exist.
-        """
-        if process is None or process.poll() is not None:
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=dict(os.environ, PYTHONUNBUFFERED="1")
-            )
-
-            # We will start two threads that will read the node process's stdout and stderr and log it
-            def stream_stdout():
-                """Thread function to read and print stdout line by line."""
-                for line in process.stdout:
-                    rospy.loginfo(line)
-
-            def stream_stderr():
-                """Thread function to read and print stderr line by line."""
-                for line in process.stderr:
-                    rospy.logerr(line)
-
-            _stdout_thread = threading.Thread(target=stream_stdout)
-            _stderr_thread = threading.Thread(target=stream_stderr)
-
-            _stdout_thread.start()
-            _stderr_thread.start()
-
-            rospy.loginfo("Robot Node has been started.")
-
-            return process, _stdout_thread, _stderr_thread
-            
-        else:
-            rospy.logerr("Cannot start Robot Node: already started!")
-
-    def _kill_node(self, process: subprocess.Popen, stdout_thread: threading.Thread, stderr_thread: threading.Thread):
-        """
-        Stop a node, if it is running.
-        """
-        if process and process.poll() is None:
-            process.terminate()
-
-            # Kill the logging threads
-            stderr_thread.join()
-            stdout_thread.join()
-
-            process.wait()
-
-            rospy.loginfo("Robot Node has been stopped.")
-
-        else:
-            rospy.logerr("Cannot stop Robot Node: not started!")
 
     def _go_forward(self):
         """
