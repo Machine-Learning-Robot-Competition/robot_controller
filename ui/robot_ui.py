@@ -52,8 +52,8 @@ LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
 ROBOT_PACKAGE_NAME: str = "robot_controller"
 ROBOT_CONTROL_NODE_NAME: str = "robot_control.py"
 ROBOT_BRAIN_NODE_NAME: str = "robot_brain.py"
-LAUNCH_CONTROL_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_CONTROL_NODE_NAME]
-LAUNCH_BRAIN_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_BRAIN_NODE_NAME]
+NAVIGATION_CONTROLLER_NAME: str = "navigation_controller.py"
+MASTER_CONTROLLER_NAME: str = "master_control.py"
 CONTROLLERS: List[str] = ["controller/velocity", "controller/attitude"]
 TIME_ELAPSED_UPDATE_PERIOD = 10 # ms
 
@@ -95,12 +95,14 @@ class RobotUI(QtWidgets.QMainWindow):
         self.control_state.clicked.connect(self.SLOT_control_state)
         self.brain_state.clicked.connect(self.SLOT_brain_state)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
-        self.go_forward_button.clicked.connect(self.SLOT_go_forward)
+        self.navigation_toggle_button.clicked.connect(self.SLOT_toggle_navigation)
         self.vision_button.clicked.connect(self.SLOT_vision_button)
 
         # Handlers that wrap nodes running in subprocesses
         self._control_node: NodeThread = NodeThread(ROBOT_CONTROL_NODE_NAME)
         self._brain_node: NodeThread = NodeThread(ROBOT_BRAIN_NODE_NAME)
+        self._master_node: NodeThread = NodeThread(MASTER_CONTROLLER_NAME)
+        self._navigation_node: NodeThread = NodeThread(NAVIGATION_CONTROLLER_NAME)
                 
         # We can use controller services to load and unload controllers
         # Controllers are what the drone uses to control itself. We need to unload and reload them when resetting the model position
@@ -260,6 +262,11 @@ class RobotUI(QtWidgets.QMainWindow):
         self._brain_node.start()
         self.brain_state.setText("Kill Brain")
 
+    def _enable_nav(self):
+        self._master_node.start()
+        self._navigation_node.start()
+        self.navigation_toggle_button.setText("Kill Nav")
+
     def _enable_control(self):
         self._control_node.start()
         self.control_state.setText("Kill Control")
@@ -268,36 +275,14 @@ class RobotUI(QtWidgets.QMainWindow):
         self._control_node.kill()
         self.control_state.setText("Enable Control")
     
+    def _kill_nav(self):
+        self._master_node.kill()
+        self._navigation_node.kill()
+        self.navigation_toggle_button.setText("Enable Nav")
+
     def _kill_brain(self):
         self._brain_node.kill()
         self.brain_state.setText("Enable Brain")
-
-    def _go_forward(self):
-        """
-        Initiate a request for the drone to perform a "go forward" operation.
-        """
-        twist = Twist()
-
-        if self._going_forward:
-            twist.linear.x = 0.0 
-            self._going_forward = False
-        else:
-            twist.linear.x = 1.0 
-            self._going_forward = True
-
-        self._command_publisher.publish(twist)
-        # rospy.wait_for_service(GO_FORWARD_SERVICE)
-        # try:
-        #     go_forward = rospy.ServiceProxy(GO_FORWARD_SERVICE, GoForward)
-
-        #     request = GoForwardRequest()
-
-        #     response = go_forward(request)
-
-        #     rospy.loginfo(f"Go Forward Response {response}")
-
-        # except rospy.ServiceException as e:
-        #     rospy.logerror(f"Failed to go forward: \n {e}")
 
     def SLOT_begin_button(self):
         rospy.loginfo("Trying to begin ROS Node...")
@@ -313,6 +298,17 @@ class RobotUI(QtWidgets.QMainWindow):
         else:
             self._kill_control()
             rospy.loginfo("Killed control!")
+
+    def SLOT_toggle_navigation(self):
+        rospy.loginfo("Switching navigation state...")
+
+        if self.navigation_toggle_button.text() == "Enable Nav":
+            self._enable_nav()
+            rospy.loginfo("Enabled navigation!")
+
+        else:
+            self._kill_nav()
+            rospy.loginfo("Killed navigation!")
 
     def SLOT_brain_state(self):
         rospy.loginfo("Switching brain state...")
@@ -337,11 +333,6 @@ class RobotUI(QtWidgets.QMainWindow):
         rospy.loginfo("Model Reset!")
         
         return GoForwardResponse()
-
-    def SLOT_go_forward(self):
-        rospy.loginfo("Trying to go forward...")
-
-        self._go_forward()
 
     def _load_controllers(self):
         """

@@ -6,6 +6,7 @@ from sensor_msgs.msg import Imu
 import tf
 import numpy as np
 
+
 class OdometryPublisher:
     def __init__(self):
         rospy.loginfo('OdometryPublisher node initialized!')

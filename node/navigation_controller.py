@@ -7,13 +7,16 @@ from tf.transformations import euler_from_quaternion
 
 import threading
 
+ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
+VELOCITY_PUBLISH_RATE: int = 30  # Hz
+
 class NavigationController:
     def __init__(self):
         rospy.init_node('navigation_controller', anonymous=True)
-        self.pub_rate = 45 # Hz
+        self.pub_rate = VELOCITY_PUBLISH_RATE  # Hz
 
         # publishers
-        self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.cmd_vel_pub = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
         self.reached_goal_pub = rospy.Publisher('/reached_goal', Bool, queue_size=10)
 
         # subscribers
