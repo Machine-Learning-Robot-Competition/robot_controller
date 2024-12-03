@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 import rospy
-from geometry_msgs.msg import Twist, Vector3
-from std_msgs.msg import String
-from std_msgs.msg import Empty
+from geometry_msgs.msg import Twist, Vector3, Vector3Stamped
+from std_msgs.msg import String, Empty, Float32
+from node_utils import PIDController
 from hector_uav_msgs.srv import EnableMotors
 from robot_controller.srv import GoForward, GoForwardResponse
 import time
@@ -15,11 +15,17 @@ ROBOT_TAKEOFF_COMMAND = "/ardrone/takeoff"
 ENABLE_MOTORS_SERVICE = "/enable_motors"
 GO_FORWARD_SERVICE = "/go_forward"
 ROBOT_COMMAND_TOPIC = "/robot_state_command"
+ROBOT_Z_POSITION_TOPIC = "/robot_desired_altitude"
 SCORE_TRACKER_TOPIC = "/score_tracker"
+VELOCITY_TOPIC = "/fix_velocity"
 
 # Other Declarations
 ZERO_VECTOR: Vector3 = Vector3(0.0, 0.0, 0.0)  # Just a helper definition 
 PUBLISH_RATE: int = 30  # Rate to publish the drive command to the drone, in Hz
+
+altitude_kp = 1.0
+altitude_ki = 0.4
+altitude_kd = 0.1
 
 
 class RobotControlNode:
@@ -31,17 +37,25 @@ class RobotControlNode:
 
         rospy.loginfo("Robot Control is initializing!")
 
+       # Time
+        self._current_time = time.time()
+
         # Topic Registrations
         self._cmd_publisher = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
         self._takeoff_publisher = rospy.Publisher(ROBOT_TAKEOFF_COMMAND, Empty, queue_size=1)
         self._command_subscriber = rospy.Subscriber(ROBOT_COMMAND_TOPIC, Twist, callback=self._set_action_callback, queue_size=1)
         self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
+        self._desired_altitude_subscriber = rospy.Subscriber(ROBOT_Z_POSITION_TOPIC, Float32, queue_size=1, callback=self._update_desired_altitude)
+        self._velocity_update_subscriber = rospy.Subscriber(VELOCITY_TOPIC, Vector3Stamped, queue_size=10, callback=self._update_velocity_callback)
 
         # We are advertising this service
         self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
         
         # Movement
         self._move = Twist()
+        self._altitude = 0.0
+        self._desired_altitude = 0.0
+        self._altitude_pid = PIDController(altitude_kp, altitude_ki, altitude_kd)
         
         # Publish Threading Stuff
         self._publish_rate = PUBLISH_RATE
@@ -63,27 +77,38 @@ class RobotControlNode:
 
         time.sleep(1.00)
 
-        self.set_action(linear=Vector3(0.0, 0.0, 0.25))
-
-        time.sleep(0.50)
-
-        self.stop()
-
-        # time.sleep(1.00)
-
-        # self.set_action(linear=Vector3(1.0, 0.0, 0.0))
-
-        # time.sleep(2.00)
-
-        # self.stop()
+        self._desired_altitude = 0.33
 
         self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
 
-        rospy.loginfo("Takeoff completed! Stopping...")
+        rospy.loginfo("Takeoff completed!")
+
+    def _update_velocity_callback(self, msg: Vector3Stamped):
+        z_velocity = msg.vector.z
+
+        current_time = time.time()
+        delta_t = current_time - self._current_time
+
+        self._current_time = current_time
+        self._altitude += z_velocity * delta_t
+
+    def _update_desired_altitude(self, desired_altitude: Float32):
+        self._desired_altitude = float(desired_altitude.data)
+
+        rospy.loginfo(f"Acquired New Desired Altitude: {self._desired_altitude}")
+
+    def _update_z_velocity(self):
+        update_period: float = 1.0 / PUBLISH_RATE # Period in seconds
+        z_velocity: float = self._altitude_pid.compute(self._desired_altitude, self._altitude, update_period)
+
+        self.set_z_action(z_velocity)
+
+    def set_z_action(self, z: float):
+        self._move.linear.z = z
 
     def set_action(self, twist: Twist = None, linear: Vector3 = None, angular: Vector3 = None):
         """
-        Set the action state of the drone. 
+        Set the action state of the drone. Does not affect the z-velocity, which is internally controlled.
 
         If `twist` is set, then it will override `linear` and `angular`. `linear` and `angular` are defaulted to the zero vector if not provided.
 
@@ -102,6 +127,7 @@ class RobotControlNode:
             twist.linear = linear
             twist.angular = angular
 
+        twist.linear.z = self._move.linear.z
         self._move = twist
 
     def _set_action_callback(self, command: Twist):
@@ -125,6 +151,9 @@ class RobotControlNode:
         rate = rospy.Rate(frequency)
 
         while not rospy.is_shutdown():
+            # Altitude PID Update
+            self._update_z_velocity()
+
             self._cmd_publisher.publish(self._move)
             
             rate.sleep()
@@ -199,8 +228,6 @@ if __name__ == "__main__":
     time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_control_node = RobotControlNode()
-
-    time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_control_node.takeoff()
 
