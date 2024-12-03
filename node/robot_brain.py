@@ -2,7 +2,6 @@
 
 import tensorflow as tf
 import cv2
-
 import threading
 import rospy
 import time
@@ -16,15 +15,18 @@ import traceback
 from typing import List, Tuple
 import actionlib
 from robot_controller.msg import ReadClueboardAction, ReadClueboardFeedback, ReadClueboardResult, ReadClueboardGoal
+import Levenshtein
+import pathlib
 
 
-REFERENCE_IMAGE_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "media" / "reference_image.png")  # Image Dimensions: (737, 1098)
+REFERENCE_IMAGE_PATH: str = str(pathlib.Path(__file__).absolute().parent.parent / "media" / "reference_image_cropped.png")  # Update REFERENCE_IMAGE_DIMENSIONS!
 CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 RESULT_PUBLISH_TOPIC: str = "/robot_brain/vision"
 GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
-REFERENCE_IMAGE_DIMENSIONS = (737, 1098)
+SCORE_TRACKER_TOPIC = "/score_tracker"
+REFERENCE_IMAGE_DIMENSIONS = (804, 1178)
 OUTPUT_DIMS = (210, 360)  # Height, Width
 MAX_ATTEMPTS = 30
 DEBUG = True
@@ -35,8 +37,20 @@ encoding = {
     "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25
 }
 
+clue_types = {
+    "SIZE": "1",
+    "VICTIM": "2",
+    "CRIME": "3",
+    "TIME": "4",
+    "PLACE": "5",
+    "MOTIVE": "6",
+    "WEAPON": "7",
+    "BANDIT": "8"
+}
 
 reversed_encoding = {value: key for key, value in encoding.items()}
+
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "wft5rf3.keras")
 
 
 class RobotBrainNode:
@@ -71,10 +85,23 @@ class RobotBrainNode:
         self._letters_publisher = rospy.Publisher(LETTERS_PUBLISH_TOPIC, Image, queue_size=1)
         self._extracted_image_publisher = rospy.Publisher(EXTRACTED_IMAGE_TOPIC, Image, queue_size=1)
         self._good_points_publisber = rospy.Publisher(GOOD_POINTS_TOPIC, Int16, queue_size=1)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
 
-        self._model = tf.keras.models.load_model("/home/joshua/enph353_ws/src/robot_controller/models/tfjenvf.keras")
+        self._model = tf.keras.models.load_model(MODEL_PATH)
 
         rospy.loginfo("Brain Initialized!")
+
+    def _get_closest_word(self, cnn_word):
+        closest_word = None
+        smallest_distance = float('inf')
+
+        for word in clue_types.keys():
+            distance = Levenshtein.distance(cnn_word, word)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                closest_word = word
+        
+        return closest_word
 
     def _read_clueboard(self, goal: ReadClueboardGoal):
         feedback = ReadClueboardFeedback()
@@ -88,8 +115,14 @@ class RobotBrainNode:
             clue_type, clue_value = self.read(padded_letters, spaces)
             rospy.loginfo(f"Setting result to: {clue_type}: {clue_value}")
 
-            result.clueboard_text = [clue_type, clue_value]
+            clue_type_verified = self._get_closest_word(clue_type)
+            clue_id = clue_types[clue_type_verified]
+
+            result.clueboard_text = [clue_type_verified, clue_value]
+
             self._server.set_succeeded(result)
+
+            self._score_tracker_publisher.publish(String(f"Team4,password,{clue_id},{clue_value}"))
 
         else:
             rospy.loginfo("Aborting clueboard read!")
@@ -243,12 +276,18 @@ class RobotBrainNode:
         return reversed_encoding[np.argmax(result[0])]
 
     def _align_flag(self, image):
+        cv2.imwrite("./raw_image.png", image)
         # Detect edges in the color image using pixel brightness
-        edges = cv2.Canny(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 50, 150)     
-
+        blue_image: FlatImage = extract_blue(image)
+        edges = cv2.Canny(blue_image, 50, 150)     
+        cv2.imwrite("./edges.png", edges)
         # Find contours
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
+        output_image = image.copy()
+        cv2.drawContours(output_image, contours, -1, (0, 255, 0), 2)
+        cv2.imwrite("./quadrilateral.png", output_image)
+
         # Find the largest contour
         largest_contour = max(contours, key=cv2.contourArea)
         
