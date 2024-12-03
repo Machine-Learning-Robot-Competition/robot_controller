@@ -10,11 +10,12 @@ import numpy as np
 import logging
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
-from std_msgs.msg import Int16, Bool
+from std_msgs.msg import Int16, Bool, String
 from geometry_msgs.msg import Twist
 import pathlib
 from typing import List
 from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, LoadController, UnloadController, LoadControllerRequest, UnloadControllerRequest
+from robot_controller.srv import GoForward, GoForwardRequest, GoForwardResponse
 import subprocess
 import os
 import toml
@@ -28,6 +29,9 @@ from node_utils import NodeThread
 from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
 import cv2
 
+
+# Make sure this is True for competition!
+COMPETITION_RULES: bool = False
 
 # File Paths
 UI_PATH = pathlib.Path(__file__).parent / "main.ui"
@@ -46,16 +50,17 @@ CAMERA_FEED_TOPIC: str = "/front_cam/camera/image"
 NUM_GOOD_POINTS_TOPIC: str = "/robot_brain/good_points"
 EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
+SCORE_TRACKER_TOPIC = "/score_tracker"
 
 # Other Declarations
 ROBOT_PACKAGE_NAME: str = "robot_controller"
 ROBOT_CONTROL_NODE_NAME: str = "robot_control.py"
 ROBOT_BRAIN_NODE_NAME: str = "robot_brain.py"
-LAUNCH_CONTROL_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_CONTROL_NODE_NAME]
-LAUNCH_BRAIN_NODE_CMD: List[str] = ['rosrun', ROBOT_PACKAGE_NAME, ROBOT_BRAIN_NODE_NAME]
+NAVIGATION_CONTROLLER_NAME: str = "navigation_controller.py"
+MASTER_CONTROLLER_NAME: str = "master_control.py"
 CONTROLLERS: List[str] = ["controller/velocity", "controller/attitude"]
 TIME_ELAPSED_UPDATE_PERIOD = 10 # ms
-
+COMPETITION_TIME_MS = 5 * 1000
 
 with open(CONFIG_PATH) as f:
     robot_config = toml.load(f)
@@ -94,12 +99,14 @@ class RobotUI(QtWidgets.QMainWindow):
         self.control_state.clicked.connect(self.SLOT_control_state)
         self.brain_state.clicked.connect(self.SLOT_brain_state)
         self.reset_model.clicked.connect(self.SLOT_reset_model)
-        self.go_forward_button.clicked.connect(self.SLOT_go_forward)
+        self.navigation_toggle_button.clicked.connect(self.SLOT_toggle_navigation)
         self.vision_button.clicked.connect(self.SLOT_vision_button)
 
         # Handlers that wrap nodes running in subprocesses
         self._control_node: NodeThread = NodeThread(ROBOT_CONTROL_NODE_NAME)
         self._brain_node: NodeThread = NodeThread(ROBOT_BRAIN_NODE_NAME)
+        self._master_node: NodeThread = NodeThread(MASTER_CONTROLLER_NAME)
+        self._navigation_node: NodeThread = NodeThread(NAVIGATION_CONTROLLER_NAME)
                 
         # We can use controller services to load and unload controllers
         # Controllers are what the drone uses to control itself. We need to unload and reload them when resetting the model position
@@ -128,6 +135,7 @@ class RobotUI(QtWidgets.QMainWindow):
         self._camera_feed_subscriber = rospy.Subscriber(CAMERA_FEED_TOPIC, Image, self._update_camera_feed)
         self._extracted_image_subscriber = rospy.Subscriber(EXTRACTED_IMAGE_TOPIC, Image, self._update_extracted_image)
         self._letters_subscriber = rospy.Subscriber(LETTERS_PUBLISH_TOPIC, Image, self._update_letters)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
 
         self._num_good_points = 0
         self._num_good_points_subscriber = rospy.Subscriber(NUM_GOOD_POINTS_TOPIC, Int16, self._update_good_points)
@@ -135,7 +143,16 @@ class RobotUI(QtWidgets.QMainWindow):
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self._update_elapsed_time)
         self.timer.start(TIME_ELAPSED_UPDATE_PERIOD)  # Update every second
+
+        self._world_timer = QtCore.QTimer(self)
+        self._world_timer.timeout.connect(self._stop_world)
+
         self._time_since_update = 0
+
+    def _stop_world(self):
+        self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
+
+        self._takedown_nodes()
 
     def SLOT_vision_button(self):
         rospy.loginfo("Sending read clueboard...")
@@ -236,6 +253,7 @@ class RobotUI(QtWidgets.QMainWindow):
         msg.twist.angular.y = 0.0
         msg.twist.angular.z = 0.0
 
+
         try:
             resp = self._set_model_state(msg)
             
@@ -251,12 +269,30 @@ class RobotUI(QtWidgets.QMainWindow):
         
         self._enable_brain()
         self._enable_control()
+        # self._enable_nav()
+
+        time.sleep(3)  # Nodes wait 3 seconds before actually beginning
+
+        self._score_tracker_publisher.publish(String("Team4,password,0,NA"))    
+        # If we're doing competition, ensure we stop after the time is over, otherwise don't stop training
+        if COMPETITION_RULES:
+            self._world_timer.start(COMPETITION_TIME_MS)  # Update every second
 
         self.begin_button.setEnabled(False)
+    
+    def _takedown_nodes(self):
+        self._kill_brain()
+        self._kill_control()
+        # self._kill_nav()
 
     def _enable_brain(self):
         self._brain_node.start()
         self.brain_state.setText("Kill Brain")
+
+    def _enable_nav(self):
+        self._master_node.start()
+        self._navigation_node.start()
+        self.navigation_toggle_button.setText("Kill Nav")
 
     def _enable_control(self):
         self._control_node.start()
@@ -266,36 +302,14 @@ class RobotUI(QtWidgets.QMainWindow):
         self._control_node.kill()
         self.control_state.setText("Enable Control")
     
+    def _kill_nav(self):
+        self._master_node.kill()
+        self._navigation_node.kill()
+        self.navigation_toggle_button.setText("Enable Nav")
+
     def _kill_brain(self):
         self._brain_node.kill()
         self.brain_state.setText("Enable Brain")
-
-    def _go_forward(self):
-        """
-        Initiate a request for the drone to perform a "go forward" operation.
-        """
-        twist = Twist()
-
-        if self._going_forward:
-            twist.linear.x = 0.0 
-            self._going_forward = False
-        else:
-            twist.linear.x = 1.0 
-            self._going_forward = True
-
-        self._command_publisher.publish(twist)
-        # rospy.wait_for_service(GO_FORWARD_SERVICE)
-        # try:
-        #     go_forward = rospy.ServiceProxy(GO_FORWARD_SERVICE, GoForward)
-
-        #     request = GoForwardRequest()
-
-        #     response = go_forward(request)
-
-        #     rospy.loginfo(f"Go Forward Response {response}")
-
-        # except rospy.ServiceException as e:
-        #     rospy.logerror(f"Failed to go forward: \n {e}")
 
     def SLOT_begin_button(self):
         rospy.loginfo("Trying to begin ROS Node...")
@@ -312,6 +326,17 @@ class RobotUI(QtWidgets.QMainWindow):
             self._kill_control()
             rospy.loginfo("Killed control!")
 
+    def SLOT_toggle_navigation(self):
+        rospy.loginfo("Switching navigation state...")
+
+        if self.navigation_toggle_button.text() == "Enable Nav":
+            self._enable_nav()
+            rospy.loginfo("Enabled navigation!")
+
+        else:
+            self._kill_nav()
+            rospy.loginfo("Killed navigation!")
+
     def SLOT_brain_state(self):
         rospy.loginfo("Switching brain state...")
         
@@ -323,7 +348,7 @@ class RobotUI(QtWidgets.QMainWindow):
             self._kill_brain()
             rospy.loginfo("Killed control!")
 
-    def SLOT_reset_model(self):
+    def SLOT_reset_model(self, arg = None):
         rospy.loginfo("Trying to Reset Model...")
 
         self._unload_controllers()  # Stop the controllers to try to avoid weird PID stuff
@@ -333,11 +358,8 @@ class RobotUI(QtWidgets.QMainWindow):
         self._load_controllers()  # Restart controllers after a brief pause to try to avoid weird PID stuff
 
         rospy.loginfo("Model Reset!")
-
-    def SLOT_go_forward(self):
-        rospy.loginfo("Trying to go forward...")
-
-        self._go_forward()
+        
+        return GoForwardResponse()
 
     def _load_controllers(self):
         """

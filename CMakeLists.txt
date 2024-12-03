@@ -11,6 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   rospy
   std_msgs
+  rtabmap_ros
+  image_transport
+  cv_bridge
   message_generation
 )
 

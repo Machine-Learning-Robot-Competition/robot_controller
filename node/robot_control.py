@@ -47,9 +47,6 @@ class RobotControlNode:
         self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
         self._desired_altitude_subscriber = rospy.Subscriber(ROBOT_Z_POSITION_TOPIC, Float32, queue_size=1, callback=self._update_desired_altitude)
         self._velocity_update_subscriber = rospy.Subscriber(VELOCITY_TOPIC, Vector3Stamped, queue_size=10, callback=self._update_velocity_callback)
-
-        # We are advertising this service
-        self._go_forward_service = rospy.Service(GO_FORWARD_SERVICE, GoForward, self._handle_go_forward)
         
         # Movement
         self._move = Twist()
@@ -71,15 +68,7 @@ class RobotControlNode:
         """
         rospy.loginfo("Beginning takeoff procedure! Rising...")
 
-        time.sleep(1.00)
-
-        self._score_tracker_publisher.publish(String("Team4,password,0,NA"))
-
-        time.sleep(1.00)
-
         self._desired_altitude = 0.33
-
-        self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
 
         rospy.loginfo("Takeoff completed!")
 
@@ -157,34 +146,6 @@ class RobotControlNode:
             self._cmd_publisher.publish(self._move)
             
             rate.sleep()
-    
-    def _go_forward(self):
-        """
-        Perform a quick "go forward" operation
-        """
-        rospy.loginfo("Beginning go forward...")
-
-        self.set_action(linear=Vector3(1.0, 0.0, 0.0))
-
-        time.sleep(1) # 1.0 s
-
-        self.stop()
-
-        rospy.loginfo("Completed go forward!")
-
-    def _handle_go_forward(self, request):
-        response = GoForwardResponse()
-
-        try:
-            self._go_forward()
-
-            response.success = True
-
-        except Exception:
-            response.success = False
-
-        return response
-
 
     def _begin(self):
         """
@@ -225,7 +186,7 @@ class RobotControlNode:
 if __name__ == "__main__":
     rospy.init_node('robot_control')
 
-    time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
+    time.sleep(3)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_control_node = RobotControlNode()
 
