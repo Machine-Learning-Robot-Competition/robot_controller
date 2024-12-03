@@ -9,6 +9,6 @@
             <arg name="Y" value="-1.57"/> <!-- -3.14 -->
      </include>
 
-      <include file="$(find robot_controller)/launch/slam_localization.launch">
-      </include>
+      <!-- <include file="$(find robot_controller)/launch/slam_localization.launch"> -->
+      <!-- </include> -->
 </launch>
