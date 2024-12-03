@@ -348,7 +348,7 @@ def order_points(pts):
 if __name__ == "__main__":
     rospy.init_node('robot_brain')
 
-    time.sleep(5)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
+    time.sleep(3)   # Wait a few seconds for the ROS master node to register this node before we start doing anything
 
     robot_brain_node = RobotBrainNode()
 

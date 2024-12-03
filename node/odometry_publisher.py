@@ -5,12 +5,12 @@ from geometry_msgs.msg import Vector3Stamped, Point, Quaternion
 from sensor_msgs.msg import Imu
 import tf
 import numpy as np
+import time
 
 
 class OdometryPublisher:
     def __init__(self):
         rospy.loginfo('OdometryPublisher node initialized!')
-        rospy.init_node('odometry_publisher', log_level=rospy.DEBUG)
         
         # Create a publisher for odometry
         self.odom_pub = rospy.Publisher('/odom_custom', Odometry, queue_size=10)
@@ -106,6 +106,10 @@ class OdometryPublisher:
         # rospy.loginfo(f"Angular velocity (z-axis): {self.vth}")
 
 if __name__ == '__main__':
+    rospy.init_node('odometry_publisher', log_level=rospy.DEBUG)
+
+    time.sleep(3)
+
     try:
         odometry_publisher = OdometryPublisher()
         rospy.loginfo("Starting rospy.spin()")

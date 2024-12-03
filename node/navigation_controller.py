@@ -4,15 +4,16 @@ import numpy as np
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
 from std_msgs.msg import Float64MultiArray, Bool
 from tf.transformations import euler_from_quaternion
-
+import time
 import threading
+
 
 ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
 VELOCITY_PUBLISH_RATE: int = 30  # Hz
 
+
 class NavigationController:
     def __init__(self):
-        rospy.init_node('navigation_controller', anonymous=True)
         self.pub_rate = VELOCITY_PUBLISH_RATE  # Hz
 
         # publishers
@@ -185,6 +186,10 @@ class NavigationController:
 
 
 if __name__ == '__main__':
+    rospy.init_node('navigation_controller', anonymous=True)
+
+    time.sleep(3)
+
     try:
         navigation_controller = NavigationController()
         rospy.loginfo("Starting rospy.spin()")

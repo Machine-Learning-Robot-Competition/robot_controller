@@ -3,6 +3,8 @@
 import rospy
 import threading
 from std_msgs.msg import Float64MultiArray, Bool
+import time
+
 
 # Hardcoded goals dictionary
 goals = {
@@ -12,8 +14,6 @@ goals = {
 
 class MasterController:
     def __init__(self):
-        rospy.init_node('master_controller', anonymous=True)
-
         # Publisher for the current goal
         self.current_goal_pub = rospy.Publisher('/current_goal', Float64MultiArray, queue_size=10)
 
@@ -82,6 +82,10 @@ class MasterController:
 
 
 if __name__ == '__main__':
+    rospy.init_node('master_controller', anonymous=True)
+
+    time.sleep(3)
+
     try:
         controller = MasterController()
     except rospy.ROSInterruptException:
