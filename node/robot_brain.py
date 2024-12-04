@@ -330,6 +330,16 @@ class RobotBrainNode:
                 prediction = "O"
                 rospy.loginfo("O-Q model says O")
 
+        if prediction == "Q":
+            result = np.sum(X_data[44, 8])
+            rospy.loginfo(f"R-Q Model Result: {result}")
+            if result > 128:
+                prediction = "R"
+                rospy.loginfo("R-Q model says 6Q")
+            else:
+                prediction = "Q"
+                rospy.loginfo("R-Q model says O")
+
         if prediction == "B" or prediction == "9":
             rospy.loginfo(f"Normal model says: {prediction}")
             rospy.loginfo("Using B9 model...")
