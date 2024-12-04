@@ -43,13 +43,13 @@ class NavigationController:
         # PID controller gains
         self.kp = 1.0
         self.ki = 0.00 # no integral gain for now
-        self.kd = 0.011
+        self.kd = 0.012
         self.integral_error = np.zeros(2)
         self.previous_error = np.zeros(2)
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.3
+        self.goal_tolerance = 0.22
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
@@ -135,11 +135,11 @@ class NavigationController:
             angular_error = np.arctan2(np.sin(angular_error), np.cos(angular_error))  # Normalize to [-pi, pi]
 
             # Angular velocity control (proportional term only)
-            angular_velocity = 2.0 * angular_error  # Gain of 2.0 for angular control
+            angular_velocity = angular_error
             self.current_cmd.angular.z = angular_velocity
 
             # If aligned within a small angular tolerance, stop rotation
-            angular_tolerance = 0.05  # 0.05 radians (~3 degrees)
+            angular_tolerance = 0.1  # 0.05 radians (~6 degrees)
             if abs(angular_error) < angular_tolerance:
                 self.current_cmd.angular.z = 0.0
         else:
@@ -166,8 +166,10 @@ class NavigationController:
             )
 
             scaling_factor = 1
-            if error_magnitude < 1.4:
-                scaling_factor = 0.3 * error_magnitude
+            if error_magnitude < 2:
+                scaling_factor = 0.4 * error_magnitude
+                if self.reached_goal_count == 1:
+                    scaling_factor = max(scaling_factor, 0.2)
 
             
             if np.linalg.norm(control_output) > .8:
@@ -178,7 +180,7 @@ class NavigationController:
             self.current_cmd.linear.x = control_output[0]
             self.current_cmd.linear.y = 0.0
             self.current_cmd.linear.z = 0.0
-            self.current_cmd.angular.z = 2.0 * angular_error
+            self.current_cmd.angular.z = 1.5 * angular_error
 
             self.previous_error = error_in_robot_frame
 
