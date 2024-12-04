@@ -52,7 +52,7 @@ class NavigationController:
         self.goal_tolerance = 0.3
         self.reached_goal = False
         self.reached_goal_count = 0
-        self.reached_goal_threshold = 3 # number of time needed to be at goal to be considered done (account for oscillations)
+        self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
 
     def _publish_cmd_vel(self):
         """Continuously publish the current velocity command to /cmd_vel."""
