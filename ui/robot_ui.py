@@ -104,7 +104,7 @@ class RobotUI(QtWidgets.QMainWindow):
 
         # Handlers that wrap nodes running in subprocesses
         self._control_node: NodeThread = NodeThread(ROBOT_CONTROL_NODE_NAME)
-        self._brain_node: NodeThread = NodeThread(ROBOT_BRAIN_NODE_NAME)
+        # self._brain_node: NodeThread = NodeThread(ROBOT_BRAIN_NODE_NAME)
         self._master_node: NodeThread = NodeThread(MASTER_CONTROLLER_NAME)
         self._navigation_node: NodeThread = NodeThread(NAVIGATION_CONTROLLER_NAME)
                 
@@ -289,8 +289,8 @@ class RobotUI(QtWidgets.QMainWindow):
         # self._kill_nav()
 
     def _enable_brain(self):
-        self._brain_node.start()
-        self._brain_is_running = True
+        # self._brain_node.start()
+        # self._brain_is_running = True
         self.brain_state.setText("Kill Brain")
 
     def _enable_nav(self):
@@ -312,8 +312,8 @@ class RobotUI(QtWidgets.QMainWindow):
         self.navigation_toggle_button.setText("Enable Nav")
 
     def _kill_brain(self):
-        self._brain_node.kill()
-        self._brain_is_running = False
+        # self._brain_node.kill()
+        # self._brain_is_running = False
         self.brain_state.setText("Enable Brain")
 
     def SLOT_begin_button(self):
