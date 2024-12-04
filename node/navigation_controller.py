@@ -60,6 +60,7 @@ class NavigationController:
         self.alignment_threshold = 1
 
         self.sent_reached_goal = False
+        self.idle = False
 
     def _publish_cmd_vel(self):
         """Continuously publish the current velocity command to /cmd_vel."""
@@ -98,6 +99,7 @@ class NavigationController:
             self.goal_position = new_goal_position
             self.reached_goal = False
             self.sent_reached_goal = False
+            self.idle = False
             self.reached_goal_count = 0
             self.alignment_count = 0
         else:
@@ -107,7 +109,7 @@ class NavigationController:
     
     def update_pid_controller(self):
         """Calculate and publish a velocity vector using a PID controller."""
-        if self.goal_position is None:
+        if self.goal_position is None or self.idle:
             self.current_cmd.linear.x = 0.0
             self.current_cmd.linear.y = 0.0
             self.current_cmd.linear.z = 0.0
@@ -153,11 +155,12 @@ class NavigationController:
                 self.alignment_count += 1
                 if self.alignment_count >= self.alignment_threshold:
                     self.current_cmd.angular.z = 0.0
+                    self.idle = True
                     if not self.sent_reached_goal:
                         rospy.loginfo("Goal reached!")
                         self.reached_goal_pub.publish(Bool(data=True))
                         self.sent_reached_goal = True
-                        self.goal_position = None
+                        
             
         else:
             # Regular PID-based navigation
