@@ -9,6 +9,8 @@
             <arg name="Y" value="-1.57"/> <!-- -3.14 -->
      </include>
 
+     <node name="robot_brain" pkg="robot_controller" type="robot_brain.py" output="screen" />
+
       <include file="$(find robot_controller)/launch/slam_localization.launch">
       </include>
 </launch>
