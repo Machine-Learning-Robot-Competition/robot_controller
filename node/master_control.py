@@ -12,13 +12,13 @@ ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
 
 # goals dictionary
 goals = {
-    "sign_start": [0.25, -0.8, 0, -1.20],
+    "sign_start": [0.25, -0.75, 0, -1.20],
     "sign_top_middle": [-1.15, -4.319, 0, 3.555],
     "sign_top_left": [-0.25, -3.7, 0, -1.45], 
     "sign_top_right": [-4.95, -3.50, 0, 1.6],
-    "sign_bottom_middle": [-4.9, -0.20, 0, -1.23],
-    "sign_bottom_right": [-8.83, -0.834, 0, 3.06],
-    "sign_tunnel": [-9.83, -4.7, 0, -0.1],
+    "sign_bottom_middle": [-4.78, -0.25, 0, -1.23],
+    "sign_bottom_right": [-8.68, -0.834, 0, 3.06],
+    "sign_tunnel": [-9.83, -4.8, 0, -0.1],
     "sign_mountain": [-6.4427, -3.69, 0, -0.0803],
     "tunnel_dive": [-8.673, -4.735, 0, 0]
 }
@@ -85,22 +85,22 @@ class MasterController:
         self.current_cmd.linear.x = 0.0
         self.current_cmd.linear.y = 0.0
         self.current_cmd.linear.z = 0.0
-        self.current_cmd.angular.z = 0.5
-        for _ in range(3):
+        self.current_cmd.angular.z = 0.1
+        for _ in range(5):
             self.cmd_vel_pub.publish(self.current_cmd)
-            rospy.sleep(0.05)
-        rospy.sleep(0.3)
+            rospy.sleep(0.1)
+        rospy.sleep(0.5)
 
     def adjustment_left_yaw(self):
         self.current_goal = None
-        self.current_cmd.linear.x = 0.5
+        self.current_cmd.linear.x = 0.2
         self.current_cmd.linear.y = 0.0
         self.current_cmd.linear.z = 0.0
-        self.current_cmd.angular.z = -0.5
+        self.current_cmd.angular.z = 0.0
         for _ in range(5):
             self.cmd_vel_pub.publish(self.current_cmd)
-            rospy.sleep(0.05)
-        rospy.sleep(0.3)
+            rospy.sleep(0.1)
+        rospy.sleep(1)
 
 
     def _send_read_clueboard(self):
@@ -143,16 +143,16 @@ class MasterController:
         """Wait until the current goal is reached."""
         rospy.loginfo("Waiting for goal to be reached...")
         while not self.goal_reached and not rospy.is_shutdown():
-            rospy.sleep(0.5)
+            rospy.sleep(0.3)
         self.goal_reached = False  # Reset for the next goal
 
     def read_sign(self, altitude):
         self.altitute_pub.publish(altitude)
-        rospy.sleep(0.5)
+        rospy.sleep(0.8)
         print("READING BOARD")
         self._send_read_clueboard()
         while self._reading_clueboard and not rospy.is_shutdown():
-            rospy.sleep(0.5)
+            rospy.sleep(0.3)
 
     def shutdown(self):
         """Shutdown the publishing thread."""
@@ -178,12 +178,12 @@ class MasterController:
         self.navigate_to_sign("sign_bottom_middle", self.navigation_alt)
         self.read_sign(self.reading_alt)
         self.altitute_pub.publish(self.navigation_alt)
-        self.adjustment_angular()
+        # self.adjustment_angular()
 
         self.navigate_to_sign("sign_bottom_right", self.navigation_alt)
         self.read_sign(self.reading_alt)
         self.altitute_pub.publish(self.navigation_alt)
-        self.adjustment_left_yaw()
+        # self.adjustment_left_yaw()
 
         self.navigate_to_sign("sign_tunnel", self.navigation_alt)
         self.read_sign(self.reading_alt_tunnel)   
