@@ -58,7 +58,7 @@ class NavigationController:
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
         self.alignment_count = 0
-        self.alignment_threshold = 1
+        self.alignment_threshold = 2
 
         self.sent_reached_goal = False
 

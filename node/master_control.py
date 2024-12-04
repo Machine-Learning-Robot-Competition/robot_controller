@@ -12,15 +12,15 @@ ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
 
 # goals dictionary
 goals = {
-    "sign_start": [0.25, -0.75, 0, -1.20],
+    "sign_start": [0.25, -0.70, 0, -1.20],
     "sign_top_middle": [-1.15, -4.319, 0, 3.555],
-    "sign_top_left": [-0.25, -3.7, 0, -1.45], 
+    "sign_top_left": [-0.33, -3.7, 0, -1.45], 
     "sign_top_right": [-4.95, -3.50, 0, 1.6],
     "sign_bottom_middle": [-4.78, -0.25, 0, -1.23],
     "sign_bottom_right": [-8.68, -0.914, 0, 3.06],
     "sign_tunnel": [-9.83, -4.8, 0, -0.1],
     "sign_mountain": [-6.4427, -3.69, 0, -0.0803],
-    "tunnel_dive": [-8.673, -4.735, 0, 0]
+    "tunnel_dive": [-8.673, -4.8, 0, 0]
 }
 
 SCORE_TRACKER_TOPIC = "/score_tracker"
@@ -125,7 +125,7 @@ class MasterController:
 
     def read_sign(self, altitude):
         self.altitute_pub.publish(altitude)
-        rospy.sleep(0.8)
+        rospy.sleep(1)
         print("READING BOARD")
         self._send_read_clueboard()
         while self._reading_clueboard and not rospy.is_shutdown():
