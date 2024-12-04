@@ -86,10 +86,10 @@ class MasterController:
         self.current_cmd.linear.y = 0.0
         self.current_cmd.linear.z = 0.0
         self.current_cmd.angular.z = 0.5
-        for _ in range(5):
+        for _ in range(3):
             self.cmd_vel_pub.publish(self.current_cmd)
             rospy.sleep(0.05)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
 
     def adjustment_left_yaw(self):
         self.current_goal = None
@@ -100,7 +100,7 @@ class MasterController:
         for _ in range(5):
             self.cmd_vel_pub.publish(self.current_cmd)
             rospy.sleep(0.05)
-        rospy.sleep(0.5)
+        rospy.sleep(0.3)
 
 
     def _send_read_clueboard(self):
