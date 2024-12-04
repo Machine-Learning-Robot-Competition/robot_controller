@@ -27,14 +27,15 @@ EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
 SCORE_TRACKER_TOPIC = "/score_tracker"
 REFERENCE_IMAGE_DIMENSIONS = (804, 1178)
-OUTPUT_DIMS = (210, 360)  # Height, Width
+OUTPUT_DIMS = (360, 210)  # Height, Width, 315, 540
 MAX_ATTEMPTS = 30
 DEBUG = True
 
 encoding = {
     "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9,
     "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18,
-    "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25
+    "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25, "0": 26, "1": 27,
+    "2": 28, "3": 29, "4": 30, "5": 31, "6": 32, "7": 33, "8": 34, "9": 35
 }
 
 clue_types = {
@@ -50,7 +51,7 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "wft5rf3.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "fee3ufn.keras")
 
 
 class RobotBrainNode:
@@ -278,7 +279,7 @@ class RobotBrainNode:
     def _align_flag(self, image):
         cv2.imwrite("./raw_image.png", image)
         # Detect edges in the color image using pixel brightness
-        blue_image: FlatImage = extract_blue(image)
+        blue_image: FlatImage = extract_blue(image, lower_saturation=50)
         edges = cv2.Canny(blue_image, 50, 150)     
         cv2.imwrite("./edges.png", edges)
         # Find contours
@@ -322,7 +323,7 @@ class RobotBrainNode:
             # Warp the color image to align the flag
             aligned_flag = cv2.warpPerspective(image, H_align, (width, height))
 
-            aligned_flag_resized = cv2.resize(aligned_flag, (360, 210))
+            aligned_flag_resized = cv2.resize(aligned_flag, OUTPUT_DIMS)
 
             return aligned_flag_resized, True
 

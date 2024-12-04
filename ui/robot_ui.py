@@ -147,6 +147,8 @@ class RobotUI(QtWidgets.QMainWindow):
         self._world_timer = QtCore.QTimer(self)
         self._world_timer.timeout.connect(self._stop_world)
 
+        self._brain_is_running = False
+
         self._time_since_update = 0
 
     def _stop_world(self):
@@ -163,10 +165,11 @@ class RobotUI(QtWidgets.QMainWindow):
         self.update_label.setText(f"Time Elapsed since Update: {self._time_since_update}ms") 
 
     def _send_read_clueboard(self):
-        self._read_clueboard_client.wait_for_server()
+        if self._brain_is_running:
+            self._read_clueboard_client.wait_for_server()
 
-        goal = ReadClueboardGoal()
-        self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback, done_cb=self._read_clueboard_done_cb)
+            goal = ReadClueboardGoal()
+            self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback, done_cb=self._read_clueboard_done_cb)
 
     def _read_clueboard_callback(self, feedback: ReadClueboardFeedback):
         rospy.loginfo(feedback.clueboard_lock_success)
@@ -287,6 +290,7 @@ class RobotUI(QtWidgets.QMainWindow):
 
     def _enable_brain(self):
         self._brain_node.start()
+        self._brain_is_running = True
         self.brain_state.setText("Kill Brain")
 
     def _enable_nav(self):
@@ -309,6 +313,7 @@ class RobotUI(QtWidgets.QMainWindow):
 
     def _kill_brain(self):
         self._brain_node.kill()
+        self._brain_is_running = False
         self.brain_state.setText("Enable Brain")
 
     def SLOT_begin_button(self):

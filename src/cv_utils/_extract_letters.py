@@ -6,11 +6,11 @@ from typing import List, Tuple
 ColorImage = np.ndarray
 FlatImage = np.ndarray
 
-LOWER_BLUE = np.array([110,50,50])
-UPPER_BLUE = np.array([130,255,255])
+LOWER_BLUE = lambda lower_saturation: np.array([110, lower_saturation, 50])
+UPPER_BLUE = np.array([130, 255, 255])
 
 
-def extract_blue(image: ColorImage) -> FlatImage:
+def extract_blue(image: ColorImage, lower_saturation: int = 100) -> FlatImage:
     """
     Extract only the blue parts of an image (value and saturation compensated)
     
@@ -19,7 +19,7 @@ def extract_blue(image: ColorImage) -> FlatImage:
     hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
     # Threshold the HSV image to get only blue colors
-    return cv2.inRange(hsv_image, LOWER_BLUE, UPPER_BLUE)
+    return cv2.inRange(hsv_image, LOWER_BLUE(lower_saturation), UPPER_BLUE)
 
 
 def extract_contours(image: FlatImage) -> List[np.ndarray]:
