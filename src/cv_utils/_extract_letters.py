@@ -32,10 +32,25 @@ def order_contours_natural_reading(contours):
     # Calculate the bounding box for each contour
     def get_contour_bounds(contour):
         x, y, w, h = cv2.boundingRect(contour)
-        return (y, x)  # Prioritize y (vertical position) first
+        return x
     
     # Sort contours first by y-coordinate (top), then by x-coordinate (left)
     return sorted(contours, key=get_contour_bounds)
+
+
+def split_contours(contours):
+    clue_type = []
+    clue_prediction = []
+
+    for i, contour in enumerate(contours):
+        x, y, w, h = cv2.boundingRect(contour)
+        print(f"Y[{i}]: {y}")
+        if y > 360 / 2:
+           clue_prediction.append(i)
+        else:
+            clue_type.append(i)
+    
+    return clue_type, clue_prediction
 
 
 def order_contours_natural_reading_with_details(contours):
@@ -96,8 +111,9 @@ def extract_contours(image: FlatImage) -> List[np.ndarray]:
                 filtered_contours.append(contour)
 
     ordered_contours = order_contours_natural_reading(filtered_contours)
+    divided_contours = split_contours(ordered_contours)
 
-    return ordered_contours
+    return ordered_contours, divided_contours
 
 
 def extract_letters(image: FlatImage, contours: List[np.ndarray]) -> List[FlatImage]:
