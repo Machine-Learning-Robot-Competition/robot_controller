@@ -68,6 +68,36 @@ def extract_letters(image: FlatImage, contours: List[np.ndarray]) -> List[FlatIm
 
     return processed_letters
 
+
+def resize_if_bigger(image, target_width, target_height):
+    # Get the original dimensions of the image
+    original_height, original_width = image.shape[:2]
+    
+    # Determine the new dimensions
+    new_width = min(original_width, target_width)
+    new_height = min(original_height, target_height)
+    
+    # Check which dimension(s) need to be resized
+    if original_width > target_width and original_height > target_height:
+        # Resize both dimensions, preserving aspect ratio
+        aspect_ratio = original_width / original_height
+        if new_width / new_height > aspect_ratio:
+            new_width = int(new_height * aspect_ratio)
+        else:
+            new_height = int(new_width / aspect_ratio)
+    elif original_width > target_width:
+        # Resize width only
+        new_height = original_height
+    elif original_height > target_height:
+        # Resize height only
+        new_width = original_width
+    
+    # Resize the image using cv2.resize
+    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+    
+    return resized_image
+
+
 def pad_to_size(array, target_shape=(40, 40), fill_value=0) -> FlatImage:
     """
     Pad a 2D NumPy array to a target shape, centering the original array.
@@ -136,7 +166,7 @@ def pad_image_collection(images, target_shape=(40, 40), fill_value=0) -> List[Fl
     numpy.ndarray
         Array of padded images
     """
-    return np.array([pad_to_size(img, target_shape, fill_value) for img in images])
+    return np.array([pad_to_size(resize_if_bigger(img, target_shape[1], target_shape[0]), target_shape, fill_value) for img in images])
 
 
 def bbox_min_distance(bbox1: np.ndarray, bbox2: np.ndarray) -> float:
