@@ -52,7 +52,7 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "o4hsh9k.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "27ijcbd.keras")
 DO_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "DO_classifier.keras")
 B9_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "B9_classifier.keras")
 
