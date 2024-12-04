@@ -272,7 +272,7 @@ class RobotUI(QtWidgets.QMainWindow):
         
         self._enable_brain()
         self._enable_control()
-        # self._enable_nav()
+        self._enable_nav()
 
         time.sleep(3)  # Nodes wait 3 seconds before actually beginning
 
@@ -286,7 +286,7 @@ class RobotUI(QtWidgets.QMainWindow):
     def _takedown_nodes(self):
         self._kill_brain()
         self._kill_control()
-        # self._kill_nav()
+        self._kill_nav()
 
     def _enable_brain(self):
         # self._brain_node.start()
