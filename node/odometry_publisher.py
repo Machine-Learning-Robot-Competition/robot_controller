@@ -22,7 +22,7 @@ class OdometryPublisher:
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0  # Added z position
-        self.theta = 3.1415926535897  # Robot orientation (heading)
+        self.theta = -1.570796327  # Robot orientation (heading)
         self.last_time = rospy.Time.now()
 
         # Subscribe to the fix_velocity topic from hector_quadrotor (geometry_msgs/Vector3Stamped)

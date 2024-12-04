@@ -1,0 +1,31 @@
+digraph G {
+"base_link" -> "front_cam_optical_joint"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 209.354 sec old)\nBuffer length: 0.000 sec\n"];
+"base_stabilized" -> "base_link"[label="Broadcaster: /pose_estimation\nAverage rate: 100.241 Hz\nMost recent transform: 209.350 ( 0.004 sec old)\nBuffer length: 4.150 sec\n"];
+"base_link" -> "sonar_link"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 209.354 sec old)\nBuffer length: 0.000 sec\n"];
+"nav" -> "base_footprint"[label="Broadcaster: /pose_estimation\nAverage rate: 100.241 Hz\nMost recent transform: 209.350 ( 0.004 sec old)\nBuffer length: 4.150 sec\n"];
+"base_footprint" -> "base_stabilized"[label="Broadcaster: /pose_estimation\nAverage rate: 100.241 Hz\nMost recent transform: 209.350 ( 0.004 sec old)\nBuffer length: 4.150 sec\n"];
+"ground_truth/base_footprint" -> "camera_link"[label="Broadcaster: /base_to_camera_tf\nAverage rate: 143.684 Hz\nMost recent transform: 209.357 ( -0.003 sec old)\nBuffer length: 4.148 sec\n"];
+"P1_tf/odom" -> "P1_tf/base_link"[label="Broadcaster: /gazebo\nAverage rate: 19.484 Hz\nMost recent transform: 209.328 ( 0.026 sec old)\nBuffer length: 4.106 sec\n"];
+"P2_tf/odom" -> "P2_tf/base_link"[label="Broadcaster: /gazebo\nAverage rate: 19.474 Hz\nMost recent transform: 209.350 ( 0.004 sec old)\nBuffer length: 4.108 sec\n"];
+"V1_tf/odom" -> "V1_tf/base_link"[label="Broadcaster: /gazebo\nAverage rate: 19.477 Hz\nMost recent transform: 209.308 ( 0.046 sec old)\nBuffer length: 4.056 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 209.354"[ shape=plaintext ] ;
+ }->"nav";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 209.354"[ shape=plaintext ] ;
+ }->"ground_truth/base_footprint";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 209.354"[ shape=plaintext ] ;
+ }->"P1_tf/odom";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 209.354"[ shape=plaintext ] ;
+ }->"P2_tf/odom";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 209.354"[ shape=plaintext ] ;
+ }->"V1_tf/odom";
+}

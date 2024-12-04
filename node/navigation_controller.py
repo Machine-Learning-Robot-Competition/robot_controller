@@ -40,7 +40,7 @@ class NavigationController:
         # PID controller gains
         self.kp = 1.0
         self.ki = 0.00 # no integral gain for now
-        self.kd = 0.0050
+        self.kd = 0.012
         self.integral_error = np.zeros(2)
         self.previous_error = np.zeros(2)
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
@@ -102,6 +102,7 @@ class NavigationController:
         # Error in the global frame (x, y)
         error = self.relative_pose[:2]
         error_magnitude = np.linalg.norm(error)
+        print(f'DISTANCE {error_magnitude}')
 
         # Check if the goal has been reached
         if error_magnitude < self.goal_tolerance:
@@ -160,8 +161,15 @@ class NavigationController:
                 self.kd * derivative_error
             )
 
-            if np.linalg.norm(control_output) > 1:
-                control_output = control_output / np.linalg.norm(control_output)
+            scaling_factor = 1
+            if error_magnitude < 1:
+                scaling_factor = 0.2
+
+            
+            if np.linalg.norm(control_output) > .8:
+                control_output =  control_output / np.linalg.norm(control_output) * 0.8
+
+            control_output *= scaling_factor
 
             self.current_cmd.linear.x = control_output[0]
             self.current_cmd.linear.y = 0.0

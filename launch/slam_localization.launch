@@ -50,10 +50,11 @@
 
       <param name="Mem/ResetCurrentPos" type="bool" value="true"/>
       <param name="Mem/InitWMWithAllNodes" type="bool" value="false"/>
-      <param name="initial_pose" type="string" value="0.0 0.0 0.0 0.0 0.0 3.1415926535897"/>
+      <param name="initial_pose" type="string" value="0.0 0.0 0.0 0.0 0.0 3.14159"/>
 
 
-
+      <param name="Mem/LocalizationDataSaved" type="bool" value="false"/>
+      <param name="RGBD/StartAtOrigin" type="bool" value="true"/>
 
 
       <!-- Use separate RGB and Depth topics (disable combined rgbd_image topic) -->
