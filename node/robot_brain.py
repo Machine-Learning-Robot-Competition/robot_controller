@@ -27,7 +27,8 @@ EXTRACTED_IMAGE_TOPIC: str = "/robot_brain/extracted_image"
 LETTERS_PUBLISH_TOPIC: str = "/robot_brain/letters_image"
 SCORE_TRACKER_TOPIC = "/score_tracker"
 REFERENCE_IMAGE_DIMENSIONS = (804, 1178)
-OUTPUT_DIMS = (360, 210)  # Height, Width, 315, 540
+TARGET_SHAPE = (48, 42)
+OUTPUT_DIMS = (int(360*1.5), int(210*1.5))  # Height, Width, 315, 540
 MAX_ATTEMPTS = 30
 DEBUG = True
 
@@ -51,7 +52,7 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "fee3ufn.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "uv01a6k.keras")
 
 
 class RobotBrainNode:
@@ -233,13 +234,20 @@ class RobotBrainNode:
                 cv2.imwrite("./output_image.png", output_image)
 
             letters: List[FlatImage] = extract_letters(blue_image, contours)
+                
             if DEBUG:
                 for i, letter in enumerate(letters):
+                    rospy.loginfo(f"Size {i}: {letter.shape}")
                     cv2.imwrite(f"./letters/{i}.png", letter)
 
             try:
-                padded_letters: List[FlatImage] = pad_image_collection(letters, target_shape=(40, 35))
-                spaces: List[Tuple[int, int]] = identify_spaces(contours, minimum_distance=20.0)
+                padded_letters: List[FlatImage] = pad_image_collection(letters, target_shape=TARGET_SHAPE)
+
+                if DEBUG:
+                    for i, padded_letter in enumerate(padded_letters):
+                        cv2.imwrite(f"./padded_letters/{i}.png", padded_letter)
+
+                spaces: List[Tuple[int, int]] = identify_spaces(contours, minimum_distance=30.0)
 
                 if DEBUG:
                     banner_image = np.hstack(padded_letters)
@@ -271,7 +279,7 @@ class RobotBrainNode:
         
     
     def predict(self, X_data):
-        reshaped = X_data.reshape(40, 35)
+        reshaped = X_data.reshape(*TARGET_SHAPE)
         input_data = np.expand_dims(reshaped, axis=0)
         result = self._model.predict(input_data)
         return reversed_encoding[np.argmax(result[0])]
