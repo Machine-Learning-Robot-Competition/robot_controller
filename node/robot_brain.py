@@ -52,7 +52,9 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "cho3yqb.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "27ijcbd.keras")
+DO_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "DO_classifier.keras")
+B9_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "B9_classifier.keras")
 
 
 class RobotBrainNode:
@@ -90,6 +92,8 @@ class RobotBrainNode:
         self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
 
         self._model = tf.keras.models.load_model(MODEL_PATH)
+        self._do_model = tf.keras.models.load_model(DO_CLASSIFIER_PATH)
+        self._b9_model = tf.keras.models.load_model(B9_CLASSIFIER_PATH)
 
         rospy.loginfo("Brain Initialized!")
 
@@ -290,7 +294,33 @@ class RobotBrainNode:
         reshaped = X_data.reshape(*TARGET_SHAPE)
         input_data = np.expand_dims(reshaped, axis=0)
         result = self._model.predict(input_data)
-        return reversed_encoding[np.argmax(result[0])]
+        prediction = reversed_encoding[np.argmax(result[0])]
+
+        if prediction == "D" or prediction == "O":
+            rospy.loginfo(f"Normal model says: {prediction}")
+            rospy.loginfo("Using DO model...")
+            result = self._do_model.predict(input_data)
+            rospy.loginfo(f"DO Model Result: {result}")
+            if result < 0.5:
+                prediction = "D"
+                rospy.loginfo("DO model says D")
+            else:
+                prediction = "O"
+                rospy.loginfo("DO model says O")
+            
+        if prediction == "B" or prediction == "9":
+            rospy.loginfo(f"Normal model says: {prediction}")
+            rospy.loginfo("Using B9 model...")
+            result = self._b9_model.predict(input_data)
+            rospy.loginfo(f"B9 Model Result: {result}")
+            if result < 0.5:
+                prediction = "B"
+                rospy.loginfo("B9 model says B")
+            else:
+                prediction = "9"
+                rospy.loginfo("B9 model says 9")
+            
+        return prediction
 
     def _align_flag(self, image):
         cv2.imwrite("./raw_image.png", image)
