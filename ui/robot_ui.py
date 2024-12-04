@@ -60,7 +60,7 @@ NAVIGATION_CONTROLLER_NAME: str = "navigation_controller.py"
 MASTER_CONTROLLER_NAME: str = "master_control.py"
 CONTROLLERS: List[str] = ["controller/velocity", "controller/attitude"]
 TIME_ELAPSED_UPDATE_PERIOD = 10 # ms
-COMPETITION_TIME_MS = 5 * 1000
+COMPETITION_TIME_MS = 240 * 1000
 
 with open(CONFIG_PATH) as f:
     robot_config = toml.load(f)

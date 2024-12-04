@@ -2,7 +2,7 @@
 
 import rospy
 import threading
-from std_msgs.msg import Float64MultiArray, Bool, Float32
+from std_msgs.msg import Float64MultiArray, Bool, Float32, String
 import time
 from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
 import actionlib
@@ -11,15 +11,17 @@ import actionlib
 # goals dictionary
 goals = {
     "sign_start": [0.25, -0.8, 0, -1.20],
-    "sign_top_middle": [-1.15, -4.319, 0, 3.655],
+    "sign_top_middle": [-1.15, -4.319, 0, 3.555],
     "sign_top_left": [-0.25, -3.7, 0, -1.45], 
     "sign_top_right": [-4.95, -3.50, 0, 1.6],
-    "sign_bottom_middle": [-4.85, -0.165, 0, -1.23],
-    "sign_bottom_right": [-8.83, -0.734, 0, 3.06],
+    "sign_bottom_middle": [-4.75, -0.20, 0, -1.23],
+    "sign_bottom_right": [-8.83, -0.834, 0, 3.06],
     "sign_tunnel": [-9.83, -4.7, 0, -0.1],
     "sign_mountain": [-6.4427, -3.69, 0, -0.0803],
     "tunnel_dive": [-8.673, -4.735, 0, 0]
 }
+
+SCORE_TRACKER_TOPIC = "/score_tracker"
 
 
 class MasterController:
@@ -27,6 +29,8 @@ class MasterController:
         # Publisher for the current goal
         self.current_goal_pub = rospy.Publisher('/current_goal', Float64MultiArray, queue_size=10)
         self.altitute_pub = rospy.Publisher('/robot_desired_altitude', Float32, queue_size=10)
+        self._score_tracker_publisher = rospy.Publisher(SCORE_TRACKER_TOPIC, String, queue_size=10)
+
         self._read_clueboard_client = actionlib.SimpleActionClient('read_clueboard', ReadClueboardAction)
 
         # Subscriber to listen for goal completion
@@ -155,7 +159,10 @@ class MasterController:
         self.read_sign(self.mountain_alt)
         
         self.navigate_to_sign("tunnel_dive", self.mountain_alt)
-        self.read_sign(0)     
+
+        self.altitute_pub.publish(0)
+        rospy.sleep(1)
+        self._score_tracker_publisher.publish(String("Team4,password,-1,NA"))
         
         rospy.loginfo("Action sequence complete!")
 
