@@ -8,7 +8,7 @@ from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClu
 import actionlib
 
 
-# Hardcoded goals dictionary
+# goals dictionary
 goals = {
     "sign_start": [0.25, -0.8, 0, -1.20],
     "sign_top_middle": [-1.15, -4.319, 0, 3.805],
@@ -16,7 +16,9 @@ goals = {
     "sign_top_right": [-5.15, -3.40, 0, 1.07],
     "sign_bottom_middle": [-4.74, -0.365, 0, -1.23],
     "sign_bottom_right": [-8.83, -0.734, 0, 3.06],
-    "sign_tunnel": [-9.93, -4.7, 0, 0.02]
+    "sign_tunnel": [-9.93, -4.7, 0, 0.02],
+    "sign_mountain": [-6.8427, -3.69, 0, -0.0803],
+    "tunnel_dive": [-8.473, -4.735, 0, 0]
 }
 
 
@@ -38,7 +40,8 @@ class MasterController:
         # altitudes
         self.navigation_alt = 0.3
         self.reading_alt = 0.15
-        self.mountain_alt = 2
+        self.mountain_alt = 2.1
+        self.reading_alt_tunnel = 0.25
 
         # Thread for publishing the current goal
         self._stop_event = threading.Event()
@@ -95,8 +98,8 @@ class MasterController:
     def _read_clueboard_done_cb(self, state, result: ReadClueboardResult):
         rospy.loginfo(result.clueboard_text)
 
-    def navigate_to_sign(self, sign_name):
-        self.altitute_pub.publish(self.navigation_alt)
+    def navigate_to_sign(self, sign_name, altitude):
+        self.altitute_pub.publish(altitude)
         rospy.sleep(0.5)
         # Go to first goal
         rospy.loginfo(f'Setting goal to {sign_name}')
@@ -110,8 +113,8 @@ class MasterController:
             rospy.sleep(0.5)
         self.goal_reached = False  # Reset for the next goal
 
-    def read_sign(self):
-        self.altitute_pub.publish(self.reading_alt)
+    def read_sign(self, altitude):
+        self.altitute_pub.publish(altitude)
         rospy.sleep(0.5)
         print("READING BOARD")
         self._send_read_clueboard()
@@ -127,26 +130,32 @@ class MasterController:
         """Main loop to handle sequential actions."""
         rospy.loginfo("Starting action sequence...")
 
-        self.navigate_to_sign("sign_start")
-        self.read_sign()
+        self.navigate_to_sign("sign_start", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_top_left")
-        self.read_sign()
+        self.navigate_to_sign("sign_top_left", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_top_middle")
-        self.read_sign()
+        self.navigate_to_sign("sign_top_middle", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_top_right")
-        self.read_sign()
+        self.navigate_to_sign("sign_top_right", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_bottom_middle")
-        self.read_sign()
+        self.navigate_to_sign("sign_bottom_middle", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_bottom_right")
-        self.read_sign()
+        self.navigate_to_sign("sign_bottom_right", self.navigation_alt)
+        self.read_sign(self.reading_alt)
 
-        self.navigate_to_sign("sign_tunnel")
-        self.read_sign()       
+        self.navigate_to_sign("sign_tunnel", self.navigation_alt)
+        self.read_sign(self.reading_alt_tunnel)   
+
+        self.navigate_to_sign("sign_mountain", self.mountain_alt)
+        self.read_sign(self.mountain_alt)
+        
+        self.navigate_to_sign("tunnel_dive", self.mountain_alt)
+        self.read_sign(0)     
         
         rospy.loginfo("Action sequence complete!")
 

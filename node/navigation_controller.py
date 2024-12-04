@@ -52,7 +52,7 @@ class NavigationController:
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.25
+        self.goal_tolerance = 0.28
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
