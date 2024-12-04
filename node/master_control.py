@@ -14,7 +14,7 @@ ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
 goals = {
     "sign_start": [0.25, -0.70, 0, -1.20],
     "sign_top_middle": [-1.15, -4.319, 0, 3.555],
-    "sign_top_left": [-0.33, -3.7, 0, -1.45], 
+    "sign_top_left": [-0.35, -3.77, 0, -1.45], 
     "sign_top_right": [-4.95, -3.50, 0, 1.6],
     "sign_bottom_middle": [-4.78, -0.25, 0, -1.23],
     "sign_bottom_right": [-8.68, -0.914, 0, 3.06],
