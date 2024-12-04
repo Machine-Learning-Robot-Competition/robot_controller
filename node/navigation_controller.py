@@ -8,6 +8,8 @@ import time
 import threading
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import Imu
+from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
+import actionlib
 
 
 ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
@@ -25,6 +27,7 @@ class NavigationController:
         # subscribers
         rospy.Subscriber('/localization_pose', PoseWithCovarianceStamped, self.localization_callback)
         rospy.Subscriber('/current_goal', Float64MultiArray, self.goal_callback)
+        self._read_clueboard_client = actionlib.SimpleActionClient('read_clueboard', ReadClueboardAction)
 
         rospy.loginfo("Publisher and subscriber initialized!")
 
@@ -53,6 +56,7 @@ class NavigationController:
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
+        self._reading_clueboard = True
 
     def _publish_cmd_vel(self):
         """Continuously publish the current velocity command to /cmd_vel."""
@@ -197,6 +201,34 @@ class NavigationController:
         quaternion = (orientation.x, orientation.y, orientation.z, orientation.w)
         _, _, yaw = euler_from_quaternion(quaternion)
         return yaw
+
+    def _send_read_clueboard(self):
+        """
+        Call this function to tell robot brain to try to read the clueboard.
+        """
+        self._read_clueboard_client.wait_for_server(timeout=10)
+
+        goal = ReadClueboardGoal()
+        self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback)  # add arg done_cb=self._read_clueboard_done_cb to attach the done callback
+        self._reading_clueboard = True
+
+    def _read_clueboard_callback(self, feedback: ReadClueboardFeedback):
+        """
+        Called when robot brain has (successfully or failed to) acquired a lock on the clueboard
+        """
+        rospy.loginfo(feedback.clueboard_lock_success)
+        self._reading_clueboard = False
+
+        # We probably just want to move on if we can't read the clueboard, in which case we should set it to False either way
+        if feedback.clueboard_lock_success is True:
+            pass
+        else:
+            # Some repositioning sequence??
+            pass
+
+    def _read_clueboard_done_cb(self, state, result: ReadClueboardResult):
+        rospy.loginfo(result.clueboard_text)
+
 
 if __name__ == '__main__':
     rospy.init_node('navigation_controller', anonymous=True)
