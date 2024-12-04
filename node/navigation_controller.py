@@ -52,7 +52,7 @@ class NavigationController:
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.22
+        self.goal_tolerance = 0.24
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
@@ -157,6 +157,7 @@ class NavigationController:
                         rospy.loginfo("Goal reached!")
                         self.reached_goal_pub.publish(Bool(data=True))
                         self.sent_reached_goal = True
+                        self.goal_position = None
             
         else:
             # Regular PID-based navigation
