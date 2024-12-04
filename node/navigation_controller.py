@@ -43,7 +43,7 @@ class NavigationController:
         # PID controller gains
         self.kp = 1.0
         self.ki = 0.00 # no integral gain for now
-        self.kd = 0.013
+        self.kd = 0.011
         self.integral_error = np.zeros(2)
         self.previous_error = np.zeros(2)
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
@@ -167,7 +167,7 @@ class NavigationController:
 
             scaling_factor = 1
             if error_magnitude < 1.4:
-                scaling_factor = 0.5 * error_magnitude
+                scaling_factor = 0.3 * error_magnitude
 
             
             if np.linalg.norm(control_output) > .8:
