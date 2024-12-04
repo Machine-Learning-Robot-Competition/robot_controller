@@ -6,6 +6,8 @@ from std_msgs.msg import Float64MultiArray, Bool
 from tf.transformations import euler_from_quaternion
 import time
 import threading
+from geometry_msgs.msg import Vector3Stamped
+from sensor_msgs.msg import Imu
 
 
 ROBOT_VELOCITY_TOPIC: str = "/robot_state_command"
@@ -37,16 +39,17 @@ class NavigationController:
         self._publisher_thread = threading.Thread(target=self._publish_cmd_vel)
         self._publisher_thread.start()
 
+
         # PID controller gains
         self.kp = 1.0
         self.ki = 0.00 # no integral gain for now
-        self.kd = 0.0050
+        self.kd = 0.011
         self.integral_error = np.zeros(2)
         self.previous_error = np.zeros(2)
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.25
+        self.goal_tolerance = 0.3
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 3 # number of time needed to be at goal to be considered done (account for oscillations)
@@ -57,6 +60,7 @@ class NavigationController:
         while not self._stop_event.is_set() and not rospy.is_shutdown():
             self.cmd_vel_pub.publish(self.current_cmd)
             rate.sleep()
+
 
     def localization_callback(self, msg):
         """Callback for /localization_pose topic."""
@@ -73,6 +77,7 @@ class NavigationController:
         self.relative_pose = self.goal_position[:2] - self.current_pose[:2]
         print(f'relative pose: {self.relative_pose}')
         print(f'current pose: {self.current_pose}')
+
         self.update_pid_controller()
     
     def goal_callback(self, msg):
@@ -99,9 +104,9 @@ class NavigationController:
             self.current_cmd.angular.z = 0.0
             return
 
-        # Error in the global frame (x, y)
         error = self.relative_pose[:2]
         error_magnitude = np.linalg.norm(error)
+        print(f'DISTANCE {error_magnitude}')
 
         # Check if the goal has been reached
         if error_magnitude < self.goal_tolerance:
@@ -160,8 +165,15 @@ class NavigationController:
                 self.kd * derivative_error
             )
 
-            if np.linalg.norm(control_output) > 1:
-                control_output = control_output / np.linalg.norm(control_output)
+            scaling_factor = 1
+            if error_magnitude < 1.4:
+                scaling_factor = 0.3 * error_magnitude
+
+            
+            if np.linalg.norm(control_output) > .8:
+                control_output =  control_output / np.linalg.norm(control_output) * 0.8
+
+            control_output *= scaling_factor
 
             self.current_cmd.linear.x = control_output[0]
             self.current_cmd.linear.y = 0.0
@@ -183,7 +195,6 @@ class NavigationController:
         quaternion = (orientation.x, orientation.y, orientation.z, orientation.w)
         _, _, yaw = euler_from_quaternion(quaternion)
         return yaw
-
 
 if __name__ == '__main__':
     rospy.init_node('navigation_controller', anonymous=True)

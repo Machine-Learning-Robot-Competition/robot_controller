@@ -8,8 +8,8 @@ import time
 
 # Hardcoded goals dictionary
 goals = {
-    "sign_top_middle": [0, 0, 0, 3.1415],
-    "sign_top_left": [0.5, 0.5, 0, 4.4]
+    "sign_top_middle": [-1.18, -4.019, 0, 3.105],
+    "sign_top_left": [-0.064, -3.4, 0, -2.6],
 }
 
 class MasterController:
