@@ -4,27 +4,28 @@ import rospy
 import threading
 from std_msgs.msg import Float64MultiArray, Bool, Float32
 import time
+from robot_controller.msg import ReadClueboardAction, ReadClueboardGoal, ReadClueboardFeedback, ReadClueboardResult
+import actionlib
 
 
 # Hardcoded goals dictionary
 goals = {
-    "sign_start": [0.033, -0.8, 0, -1.20],
-    "sign_top_middle": [-1.38, -4.019, 0, 3.805],
-    "sign_top_left": [-0.094, -3.8, 0, -2.4], 
+    "sign_start": [0.25, -0.8, 0, -1.20],
+    "sign_top_middle": [-1.15, -4.319, 0, 3.805],
+    "sign_top_left": [-0.25, -3.7, 0, -1.65], 
     "sign_top_right": [-5.15, -3.40, 0, 1.07],
     "sign_bottom_middle": [-4.74, -0.365, 0, -1.23],
-    "sign_bottom_right": [-8.90, -0.834, 0, 3.06],
+    "sign_bottom_right": [-8.83, -0.734, 0, 3.06],
     "sign_tunnel": [-9.93, -4.7, 0, 0.02]
 }
-navigation_alt = 0.3
-reading_alt = 0.2
-mountain_alt = 2
+
 
 class MasterController:
     def __init__(self):
         # Publisher for the current goal
         self.current_goal_pub = rospy.Publisher('/current_goal', Float64MultiArray, queue_size=10)
         self.altitute_pub = rospy.Publisher('/robot_desired_altitude', Float32, queue_size=10)
+        self._read_clueboard_client = actionlib.SimpleActionClient('read_clueboard', ReadClueboardAction)
 
         # Subscriber to listen for goal completion
         rospy.Subscriber('/reached_goal', Bool, self.reached_goal_callback)
@@ -32,6 +33,12 @@ class MasterController:
         # Initialize variables
         self.current_goal = None
         self.goal_reached = False  # Flag to track when a goal is reached
+        self._reading_clueboard = False
+
+        # altitudes
+        self.navigation_alt = 0.3
+        self.reading_alt = 0.15
+        self.mountain_alt = 2
 
         # Thread for publishing the current goal
         self._stop_event = threading.Event()
@@ -43,7 +50,7 @@ class MasterController:
 
     def _publish_current_goal(self):
         """Continuously publish the current goal at a set rate."""
-        rate = rospy.Rate(0.5)  # 0.5 Hz
+        rate = rospy.Rate(1)  # 0.5 Hz
         while not self._stop_event.is_set() and not rospy.is_shutdown():
             if self.current_goal is not None:
                 # Prepare the Float64MultiArray message
@@ -55,13 +62,42 @@ class MasterController:
 
     def reached_goal_callback(self, msg):
         """Callback to update the goal_reached flag."""
-        self.goal_reached = msg.data
-        if self.goal_reached:
-            rospy.loginfo("Goal reached. Ready to proceed to the next action.")
+        if not self._reading_clueboard:
+            self.goal_reached = msg.data
+            if self.goal_reached:
+                rospy.loginfo("Goal reached. Ready to proceed to the next action.")
+
+    def _send_read_clueboard(self):
+        """
+        Call this function to tell robot brain to try to read the clueboard.
+        """
+        self._reading_clueboard = True
+        self._read_clueboard_client.wait_for_server()
+
+        goal = ReadClueboardGoal()
+        self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback)  # add arg done_cb=self._read_clueboard_done_cb to attach the done callback
+
+    def _read_clueboard_callback(self, feedback: ReadClueboardFeedback):
+        """
+        Called when robot brain has (successfully or failed to) acquired a lock on the clueboard
+        """
+        rospy.loginfo(feedback.clueboard_lock_success)
+        print("DONE READING BOARD")
+        self._reading_clueboard = False
+
+        # We probably just want to move on if we can't read the clueboard, in which case we should set it to False either way
+        if feedback.clueboard_lock_success is True:
+            pass
+        else:
+            # Some repositioning sequence??
+            pass
+
+    def _read_clueboard_done_cb(self, state, result: ReadClueboardResult):
+        rospy.loginfo(result.clueboard_text)
 
     def navigate_to_sign(self, sign_name):
-        self.altitute_pub.publish(navigation_alt)
-
+        self.altitute_pub.publish(self.navigation_alt)
+        rospy.sleep(0.5)
         # Go to first goal
         rospy.loginfo(f'Setting goal to {sign_name}')
         self.current_goal = goals[sign_name]
@@ -74,6 +110,14 @@ class MasterController:
             rospy.sleep(0.5)
         self.goal_reached = False  # Reset for the next goal
 
+    def read_sign(self):
+        self.altitute_pub.publish(self.reading_alt)
+        rospy.sleep(0.5)
+        print("READING BOARD")
+        self._send_read_clueboard()
+        while self._reading_clueboard and not rospy.is_shutdown():
+            rospy.sleep(0.5)
+
     def shutdown(self):
         """Shutdown the publishing thread."""
         self._stop_event.set()
@@ -84,46 +128,26 @@ class MasterController:
         rospy.loginfo("Starting action sequence...")
 
         self.navigate_to_sign("sign_start")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
+        self.read_sign()
 
         self.navigate_to_sign("sign_top_left")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
-
+        self.read_sign()
 
         self.navigate_to_sign("sign_top_middle")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
-
+        self.read_sign()
 
         self.navigate_to_sign("sign_top_right")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
-
+        self.read_sign()
 
         self.navigate_to_sign("sign_bottom_middle")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
-
+        self.read_sign()
 
         self.navigate_to_sign("sign_bottom_right")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
+        self.read_sign()
 
         self.navigate_to_sign("sign_tunnel")
-        rospy.loginfo("chilling!")
-        self.altitute_pub.publish(reading_alt)
-        rospy.sleep(5)
+        self.read_sign()       
         
-        self.altitute_pub.publish(navigation_alt)
-
         rospy.loginfo("Action sequence complete!")
 
 

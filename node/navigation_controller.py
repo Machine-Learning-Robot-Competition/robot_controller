@@ -52,11 +52,12 @@ class NavigationController:
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.22
+        self.goal_tolerance = 0.25
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
-        self._reading_clueboard = True
+
+        self.sent_reached_goal = False
 
     def _publish_cmd_vel(self):
         """Continuously publish the current velocity command to /cmd_vel."""
@@ -79,8 +80,8 @@ class NavigationController:
         theta = self.get_theta_from_orientation(orientation)
         self.current_pose = np.array([pose.position.x, pose.position.y, pose.position.z, theta])
         self.relative_pose = self.goal_position[:2] - self.current_pose[:2]
-        print(f'relative pose: {self.relative_pose}')
-        print(f'current pose: {self.current_pose}')
+        # print(f'relative pose: {self.relative_pose}')
+        # print(f'current pose: {self.current_pose}')
 
         self.update_pid_controller()
     
@@ -91,12 +92,14 @@ class NavigationController:
         
         # Check if the new goal is different from the current goal
         if self.goal_position is None or new_goal_position != self.goal_position:
-            rospy.loginfo(f"Updating goal position to: {new_goal_position}")
+            # rospy.loginfo(f"Updating goal position to: {new_goal_position}")
             self.goal_position = new_goal_position
             self.reached_goal = False
+            self.sent_reached_goal = False
             self.reached_goal_count = 0
         else:
-            rospy.loginfo("Received goal position is the same as the current goal. No update.")
+            pass
+            # rospy.loginfo("Received goal position is the same as the current goal. No update.")
 
     
     def update_pid_controller(self):
@@ -110,7 +113,7 @@ class NavigationController:
 
         error = self.relative_pose[:2]
         error_magnitude = np.linalg.norm(error)
-        print(f'DISTANCE {error_magnitude}')
+        # print(f'DISTANCE {error_magnitude}')
 
         # Check if the goal has been reached
         if error_magnitude < self.goal_tolerance:
@@ -118,8 +121,7 @@ class NavigationController:
             if self.reached_goal_count >= self.reached_goal_threshold:
                 if not self.reached_goal:
                     self.reached_goal = True
-                    rospy.loginfo("Goal reached!")
-                    self.reached_goal_pub.publish(Bool(data=True))
+                    
             else:
                 self.reached_goal_pub.publish(Bool(data=False))
         else:
@@ -146,6 +148,11 @@ class NavigationController:
             angular_tolerance = 0.1  # 0.05 radians (~6 degrees)
             if abs(angular_error) < angular_tolerance:
                 self.current_cmd.angular.z = 0.0
+                if not self.sent_reached_goal:
+                    rospy.loginfo("Goal reached!")
+                    self.reached_goal_pub.publish(Bool(data=True))
+                    self.sent_reached_goal = True
+            
         else:
             # Regular PID-based navigation
             desired_heading = np.arctan2(error[1], error[0])  # Angle toward the goal
@@ -202,32 +209,7 @@ class NavigationController:
         _, _, yaw = euler_from_quaternion(quaternion)
         return yaw
 
-    def _send_read_clueboard(self):
-        """
-        Call this function to tell robot brain to try to read the clueboard.
-        """
-        self._read_clueboard_client.wait_for_server(timeout=10)
 
-        goal = ReadClueboardGoal()
-        self._read_clueboard_client.send_goal(goal, feedback_cb=self._read_clueboard_callback)  # add arg done_cb=self._read_clueboard_done_cb to attach the done callback
-        self._reading_clueboard = True
-
-    def _read_clueboard_callback(self, feedback: ReadClueboardFeedback):
-        """
-        Called when robot brain has (successfully or failed to) acquired a lock on the clueboard
-        """
-        rospy.loginfo(feedback.clueboard_lock_success)
-        self._reading_clueboard = False
-
-        # We probably just want to move on if we can't read the clueboard, in which case we should set it to False either way
-        if feedback.clueboard_lock_success is True:
-            pass
-        else:
-            # Some repositioning sequence??
-            pass
-
-    def _read_clueboard_done_cb(self, state, result: ReadClueboardResult):
-        rospy.loginfo(result.clueboard_text)
 
 
 if __name__ == '__main__':
