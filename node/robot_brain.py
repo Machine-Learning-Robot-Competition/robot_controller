@@ -109,12 +109,13 @@ class RobotBrainNode:
         feedback = ReadClueboardFeedback()
         result = ReadClueboardResult()
 
-        success, padded_letters, spaces = self.see()
+        success, padded_letters, split_contours = self.see()
+        rospy.loginfo(f"Contours: {split_contours}")
         feedback.clueboard_lock_success = success
         self._server.publish_feedback(feedback)
 
         if success:
-            clue_type, clue_value = self.read(padded_letters, spaces)
+            clue_type, clue_value = self.read(padded_letters, split_contours)
             rospy.loginfo(f"Setting result to: {clue_type}: {clue_value}")
 
             clue_type_verified = self._get_closest_word(clue_type)
@@ -226,7 +227,7 @@ class RobotBrainNode:
             if DEBUG: 
                 cv2.imwrite("./blue_image.png", blue_image)
 
-            contours: List[np.ndarray] = extract_contours(blue_image)
+            contours, split_contours = extract_contours(blue_image)
             rospy.loginfo(f"Found contours: {len(contours)}")
             if DEBUG:
                 output_image = extracted_image.copy()
@@ -247,13 +248,13 @@ class RobotBrainNode:
                     for i, padded_letter in enumerate(padded_letters):
                         cv2.imwrite(f"./padded_letters/{i}.png", padded_letter)
 
-                spaces: List[Tuple[int, int]] = identify_spaces(contours, minimum_distance=30.0)
+                # spaces: List[Tuple[int, int]] = identify_spaces(contours, minimum_distance=30.0)
 
                 if DEBUG:
                     banner_image = np.hstack(padded_letters)
                     cv2.imwrite("./banner_image.png", banner_image)
 
-                return True, padded_letters, spaces
+                return True, padded_letters, split_contours
 
             except Exception as e:
                 rospy.logerr(f"{e} {traceback.format_exc()}")
@@ -265,8 +266,15 @@ class RobotBrainNode:
             rospy.logerr(f"{e} {traceback.format_exc()}")
             return False, None, None
 
-    def read(self, letters, spaces):
-        word_images: List[List[FlatImage]] = collect_words(letters, spaces)
+    def read(self, letters, split_contours):
+        word_images = [[], []]
+        for letter_index in split_contours[0]:
+            word_images[0].append(letters[letter_index])
+
+        for letter_index in split_contours[1]:
+            word_images[1].append(letters[letter_index])
+
+        # word_images: List[List[FlatImage]] = collect_words(letters, spaces)
 
         try:
             words: List[str] = [''.join([self.predict(letter) for letter in word]) for word in word_images]
