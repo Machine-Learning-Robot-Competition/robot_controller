@@ -19,6 +19,7 @@ VELOCITY_PUBLISH_RATE: int = 30  # Hz
 class NavigationController:
     def __init__(self):
         self.pub_rate = VELOCITY_PUBLISH_RATE  # Hz
+        self.idle = False
 
         # publishers
         self.cmd_vel_pub = rospy.Publisher(ROBOT_VELOCITY_TOPIC, Twist, queue_size=1)
@@ -60,7 +61,6 @@ class NavigationController:
         self.alignment_threshold = 1
 
         self.sent_reached_goal = False
-        self.idle = False
 
     def _publish_cmd_vel(self):
         """Continuously publish the current velocity command to /cmd_vel."""
@@ -99,7 +99,6 @@ class NavigationController:
             self.goal_position = new_goal_position
             self.reached_goal = False
             self.sent_reached_goal = False
-            self.idle = False
             self.reached_goal_count = 0
             self.alignment_count = 0
         else:
@@ -155,7 +154,6 @@ class NavigationController:
                 self.alignment_count += 1
                 if self.alignment_count >= self.alignment_threshold:
                     self.current_cmd.angular.z = 0.0
-                    self.idle = True
                     if not self.sent_reached_goal:
                         rospy.loginfo("Goal reached!")
                         self.reached_goal_pub.publish(Bool(data=True))
@@ -200,7 +198,7 @@ class NavigationController:
             self.current_cmd.linear.x = control_output[0]
             self.current_cmd.linear.y = 0.0
             self.current_cmd.linear.z = 0.0
-            self.current_cmd.angular.z = 1.5 * angular_error
+            self.current_cmd.angular.z = 0.9 * angular_error
 
             self.previous_error = error_in_robot_frame
 
