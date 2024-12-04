@@ -52,7 +52,7 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "uv01a6k.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "cho3yqb.keras")
 
 
 class RobotBrainNode:

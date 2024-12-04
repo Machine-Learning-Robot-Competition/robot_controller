@@ -22,6 +22,52 @@ def extract_blue(image: ColorImage, lower_saturation: int = 100) -> FlatImage:
     return cv2.inRange(hsv_image, LOWER_BLUE(lower_saturation), UPPER_BLUE)
 
 
+def order_contours_natural_reading(contours):
+    """
+    Order contours in natural reading order (top-down, then left-right).
+    
+    :param contours: List of contours from cv2.findContours()
+    :return: Ordered list of contours
+    """
+    # Calculate the bounding box for each contour
+    def get_contour_bounds(contour):
+        x, y, w, h = cv2.boundingRect(contour)
+        return (y, x)  # Prioritize y (vertical position) first
+    
+    # Sort contours first by y-coordinate (top), then by x-coordinate (left)
+    return sorted(contours, key=get_contour_bounds)
+
+
+def order_contours_natural_reading_with_details(contours):
+    """
+    Order contours in natural reading order with additional information.
+    
+    :param contours: List of contours from cv2.findContours()
+    :return: Tuple of (ordered_contours, bounding_boxes)
+    """
+    # Calculate bounding boxes with more details
+    def get_contour_details(contour):
+        x, y, w, h = cv2.boundingRect(contour)
+        return {
+            'contour': contour,
+            'bounds': (y, x),
+            'center': (x + w // 2, y + h // 2),
+            'area': cv2.contourArea(contour)
+        }
+    
+    # Process contours with additional metadata
+    contour_details = [get_contour_details(cnt) for cnt in contours]
+    
+    # Sort by vertical position (y), then horizontal position (x)
+    sorted_details = sorted(contour_details, key=lambda x: x['bounds'])
+    
+    # Return ordered contours and their details
+    return (
+        [detail['contour'] for detail in sorted_details],
+        sorted_details
+    )
+
+
 def extract_contours(image: FlatImage) -> List[np.ndarray]:
     """
     Extract the valid contours from an image, ordered in typical reading order (ie. left-right, then top-down)
@@ -49,7 +95,9 @@ def extract_contours(image: FlatImage) -> List[np.ndarray]:
             if x > 0 and y > 0 and (x + w) < width and (y + h) < height:
                 filtered_contours.append(contour)
 
-    return filtered_contours[::-1]
+    ordered_contours = order_contours_natural_reading(filtered_contours)
+
+    return ordered_contours
 
 
 def extract_letters(image: FlatImage, contours: List[np.ndarray]) -> List[FlatImage]:
