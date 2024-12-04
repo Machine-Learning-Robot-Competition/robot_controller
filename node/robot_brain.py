@@ -52,7 +52,7 @@ clue_types = {
 
 reversed_encoding = {value: key for key, value in encoding.items()}
 
-MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "27ijcbd.keras")
+MODEL_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "o4hsh9k.keras")
 DO_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "DO_classifier.keras")
 B9_CLASSIFIER_PATH = str(pathlib.Path(__file__).absolute().parent.parent / "models" / "B9_classifier.keras")
 
@@ -299,9 +299,10 @@ class RobotBrainNode:
         if prediction == "D" or prediction == "O":
             rospy.loginfo(f"Normal model says: {prediction}")
             rospy.loginfo("Using DO model...")
-            result = self._do_model.predict(input_data)
+
+            result = np.sum(X_data[4, 6])
             rospy.loginfo(f"DO Model Result: {result}")
-            if result < 0.5:
+            if result > 128:
                 prediction = "D"
                 rospy.loginfo("DO model says D")
             else:
