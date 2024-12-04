@@ -52,10 +52,12 @@ class NavigationController:
         self.dt = 1.0 / self.pub_rate  # Time step based on the publishing rate
 
         # Params for evaluating if the goal was reached
-        self.goal_tolerance = 0.28
+        self.goal_tolerance = 0.22
         self.reached_goal = False
         self.reached_goal_count = 0
         self.reached_goal_threshold = 2 # number of time needed to be at goal to be considered done (account for oscillations)
+        self.alignment_count = 0
+        self.alignment_threshold = 1
 
         self.sent_reached_goal = False
 
@@ -97,6 +99,7 @@ class NavigationController:
             self.reached_goal = False
             self.sent_reached_goal = False
             self.reached_goal_count = 0
+            self.alignment_count = 0
         else:
             pass
             # rospy.loginfo("Received goal position is the same as the current goal. No update.")
@@ -147,11 +150,13 @@ class NavigationController:
             # If aligned within a small angular tolerance, stop rotation
             angular_tolerance = 0.1  # 0.05 radians (~6 degrees)
             if abs(angular_error) < angular_tolerance:
-                self.current_cmd.angular.z = 0.0
-                if not self.sent_reached_goal:
-                    rospy.loginfo("Goal reached!")
-                    self.reached_goal_pub.publish(Bool(data=True))
-                    self.sent_reached_goal = True
+                self.alignment_count += 1
+                if self.alignment_count >= self.alignment_threshold:
+                    self.current_cmd.angular.z = 0.0
+                    if not self.sent_reached_goal:
+                        rospy.loginfo("Goal reached!")
+                        self.reached_goal_pub.publish(Bool(data=True))
+                        self.sent_reached_goal = True
             
         else:
             # Regular PID-based navigation

@@ -11,14 +11,14 @@ import actionlib
 # goals dictionary
 goals = {
     "sign_start": [0.25, -0.8, 0, -1.20],
-    "sign_top_middle": [-1.15, -4.319, 0, 3.805],
-    "sign_top_left": [-0.25, -3.7, 0, -1.65], 
-    "sign_top_right": [-5.15, -3.40, 0, 1.07],
-    "sign_bottom_middle": [-4.74, -0.365, 0, -1.23],
+    "sign_top_middle": [-1.15, -4.319, 0, 3.655],
+    "sign_top_left": [-0.25, -3.7, 0, -1.45], 
+    "sign_top_right": [-4.95, -3.50, 0, 1.6],
+    "sign_bottom_middle": [-4.85, -0.165, 0, -1.23],
     "sign_bottom_right": [-8.83, -0.734, 0, 3.06],
-    "sign_tunnel": [-9.93, -4.7, 0, 0.02],
-    "sign_mountain": [-6.8427, -3.69, 0, -0.0803],
-    "tunnel_dive": [-8.473, -4.735, 0, 0]
+    "sign_tunnel": [-9.83, -4.7, 0, -0.1],
+    "sign_mountain": [-6.4427, -3.69, 0, -0.0803],
+    "tunnel_dive": [-8.673, -4.735, 0, 0]
 }
 
 
@@ -38,9 +38,9 @@ class MasterController:
         self._reading_clueboard = False
 
         # altitudes
-        self.navigation_alt = 0.3
-        self.reading_alt = 0.15
-        self.mountain_alt = 2.1
+        self.navigation_alt = 0.45
+        self.reading_alt = 0.2
+        self.mountain_alt = 2.25
         self.reading_alt_tunnel = 0.25
 
         # Thread for publishing the current goal
